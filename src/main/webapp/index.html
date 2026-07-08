@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FilmOracle — AI 电影评论洞察</title>
+  <link rel="icon" href="./assets/favicon.ico">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="back-button" id="global-back" type="button" aria-label="返回上一页">← 返回</button>
+        <button class="brand-lockup" type="button" data-view="home" aria-label="返回主页">
+          <span class="brand-mark"><img src="./assets/FilmOracle-logo-mark.png" alt=""></span>
+          <span>
+            <strong>FilmOracle</strong>
+            <small>AI movie review intelligence</small>
+          </span>
+        </button>
+      </div>
+      <nav class="topnav" aria-label="主导航">
+        <button type="button" data-view="home" id="nav-home">主页</button>
+        <button type="button" data-view="import" id="nav-import">导入评论</button>
+        <button type="button" data-view="history" id="nav-history">历史记录</button>
+        <button type="button" data-view="settings" id="nav-settings">设置</button>
+        <span class="nav-user-info" id="nav-user-info" style="display:none"></span>
+        <button type="button" class="nav-auth" id="nav-login">登录</button>
+        <button type="button" class="nav-auth" id="nav-logout" style="display:none">退出</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="view view-home is-active" id="view-home" aria-label="FilmOracle 首页">
+        <div class="poster-marquee top-row" id="poster-row-top" aria-hidden="true"></div>
+        <div class="home-center">
+          <div class="home-kicker">AI-Powered Movie Intelligence</div>
+          <h1>FilmOracle</h1>
+          <p>从电影搜索或评论导入开始，快速进入评论洞察、AI 图表和筛选分析。</p>
+          <form class="search-command" id="search-form">
+            <button class="secondary-action" type="button" data-view="import">导入评论</button>
+            <label class="visually-hidden" for="movie-query">搜索电影名称</label>
+            <input id="movie-query" name="query" value="" autocomplete="off" placeholder="搜索电影名称，开始评论洞察">
+            <button class="primary-action" type="submit">搜索</button>
+          </form>
+          <div class="quick-actions">
+            <button type="button" data-view="history">查看历史</button>
+            <button type="button" data-view="settings">配置 API</button>
+          </div>
+        </div>
+        <div class="poster-marquee bottom-row" id="poster-row-bottom" aria-hidden="true"></div>
+      </section>
+
+      <section class="view workspace" id="view-results" aria-label="搜索结果">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="home">返回主页</button>
+            <p class="eyebrow">搜索结果</p>
+            <h2 id="results-title">搜索结果</h2>
+          </div>
+          <button class="secondary-action" type="button" data-view="settings">设置</button>
+        </div>
+        <form class="detail-search-command" id="results-search-form">
+          <label class="visually-hidden" for="results-movie-query">搜索电影</label>
+          <input id="results-movie-query" autocomplete="off" placeholder="搜索其他电影">
+          <button class="primary-action" type="submit">搜索</button>
+        </form>
+        <div class="result-list" id="result-list"></div>
+      </section>
+
+      <section class="view workspace" id="view-detail" aria-label="电影详情分析">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="home">返回主页</button>
+            <p class="eyebrow">电影详情分析</p>
+            <h2 id="detail-heading">电影详情分析</h2>
+          </div>
+          <div class="head-actions">
+            <button class="secondary-action" type="button" data-view="import">导入评论</button>
+            <button class="secondary-action" type="button" data-view="settings">设置</button>
+          </div>
+        </div>
+
+        <section class="detail-hero">
+          <div class="poster-large" id="detail-poster">FO</div>
+          <div class="movie-facts" id="movie-facts"></div>
+          <aside class="rating-panel" id="rating-panel"></aside>
+        </section>
+
+        <section class="action-rail" aria-label="电影操作">
+          <button class="primary-action" type="button" id="fetch-comments">获取评论</button>
+          <button class="primary-action dark" type="button" id="fetch-analyze">获取并 AI 分析</button>
+          <button class="secondary-action" type="button" data-view="import">导入评论</button>
+          <button class="secondary-action" type="button" id="export-comments">导出评论</button>
+          <button class="secondary-action" type="button" id="save-history">保存到历史</button>
+        </section>
+
+        <section class="terminal-panel" aria-label="任务进度">
+          <div class="terminal-head">
+            <span>crawler-api/task-preview</span>
+            <span id="task-state">ready</span>
+          </div>
+          <pre id="task-log">等待操作。点击「获取评论」爬取豆瓣短评，或点击「获取并 AI 分析」一键完成爬取+AI分析。</pre>
+        </section>
+
+        <section class="analysis-grid" aria-label="AI 分析图表">
+          <article class="analysis-panel">
+            <div class="panel-head">
+              <h3>好评关键词</h3>
+            </div>
+            <div class="keyword-cloud" id="keyword-cloud"></div>
+          </article>
+          <article class="analysis-panel dark-panel">
+            <div class="panel-head">
+              <h3>情感散点图</h3>
+            </div>
+            <div id="scatter-chart"></div>
+          </article>
+          <article class="analysis-panel">
+            <div class="panel-head">
+              <h3>十维雷达</h3>
+            </div>
+            <div id="radar-chart"></div>
+          </article>
+          <article class="analysis-panel">
+            <div class="panel-head">
+              <h3>星级分布</h3>
+            </div>
+            <div class="rating-bars" id="rating-bars"></div>
+          </article>
+          <article class="analysis-panel wide-panel">
+            <div class="panel-head">
+              <h3>同类型对比</h3>
+            </div>
+            <div class="comparison-bars" id="comparison-bars"></div>
+          </article>
+        </section>
+
+        <section class="review-section" id="review-section">
+          <div class="panel-head">
+            <h3>AI 电影评析</h3>
+            <span class="status-tag running" id="review-tag">待生成</span>
+          </div>
+          <div id="ai-review" class="review-content">
+            <p class="muted">点击「获取并 AI 分析」后，此处将显示基于评论数据的客观评析。</p>
+          </div>
+        </section>
+
+        <section class="comments-section" aria-label="评论检索">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">评论检索</p>
+              <h3>评论检索</h3>
+            </div>
+            <label class="filter-input">
+              <span>关键词</span>
+              <input id="comment-keyword" placeholder="剧情 / 配乐 / 治愈">
+            </label>
+          </div>
+          <div class="filter-row" id="sentiment-filters">
+            <button class="is-active" type="button" data-filter="all">全部</button>
+            <button type="button" data-filter="正面">正面</button>
+            <button type="button" data-filter="中性">中性</button>
+            <button type="button" data-filter="负面">负面</button>
+          </div>
+          <div class="comment-list" id="comment-list"></div>
+        </section>
+      </section>
+
+      <section class="view workspace" id="view-import" aria-label="导入评论">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="home">返回主页</button>
+            <p class="eyebrow">导入评论</p>
+            <h2>导入评论并填写来源电影</h2>
+          </div>
+          <button class="secondary-action" type="button" data-view="settings">设置</button>
+        </div>
+        <form class="import-layout" id="import-form">
+          <section class="source-form">
+            <h3>来源电影信息</h3>
+            <div class="form-grid">
+              <label>电影名称<input name="title" value="星际穿越"></label>
+              <label>年份<input name="year" value="2014"></label>
+              <label>导演<input name="director" value="克里斯托弗·诺兰"></label>
+              <label>主演<input name="cast" value="马修·麦康纳 / 安妮·海瑟薇"></label>
+              <label>类型<input name="genre" value="科幻 / 冒险 / 剧情"></label>
+              <label>国家/地区<input name="region" value="美国 / 英国"></label>
+              <label>语言<input name="language" value="英语"></label>
+              <label>片长<input name="duration" value="169分钟"></label>
+              <label class="span-2">来源链接<input name="source" value="https://movie.douban.com/subject/demo"></label>
+              <label class="span-2">简介<textarea name="summary">一组探险家穿越虫洞，为人类寻找新的家园。</textarea></label>
+            </div>
+          </section>
+          <section class="upload-panel">
+            <h3>评论文件</h3>
+            <label class="upload-box">
+              <input type="file" accept=".csv,.xlsx,.txt">
+              <span>选择 CSV / Excel / TXT</span>
+              <small>当前阶段展示导入流程和分析效果，文件解析会在后续阶段接入。</small>
+            </label>
+            <div class="import-stats">
+              <span><strong>1,240</strong> 可导入</span>
+              <span><strong>38</strong> 重复</span>
+              <span><strong>0</strong> 错误</span>
+            </div>
+            <button class="primary-action" type="submit">生成分析原型</button>
+          </section>
+        </form>
+      </section>
+
+      <section class="view workspace" id="view-history" aria-label="历史记录">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="home">返回主页</button>
+            <p class="eyebrow">历史记录</p>
+            <h2>历史记录</h2>
+          </div>
+          <button class="secondary-action" type="button" data-view="import">导入评论</button>
+        </div>
+        <div class="history-grid" id="history-grid"></div>
+      </section>
+
+      <section class="view workspace" id="view-settings" aria-label="设置">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="home">返回主页</button>
+            <p class="eyebrow">设置</p>
+            <h2>AI 与爬虫 API 设置</h2>
+          </div>
+        </div>
+        <form class="settings-form" id="settings-form">
+          <label>本地代理 API 地址<input id="setting-api-base" value="/api"></label>
+          <label>单次获取评论数量<input id="setting-comment-count" type="number" value="100" min="20" max="500"></label>
+          <label>请求超时<input id="setting-timeout" value="9s"></label>
+          <label>AI 模型<input id="setting-model" value="moonshot-v1-8k" placeholder="moonshot-v1-8k / moonshot-v1-32k"></label>
+          <label class="span-2">API Key<input id="setting-api-key" type="password" placeholder="sk-...（留空则使用本地规则引擎）"></label>
+          <label class="span-2">AI 提示词<textarea id="setting-prompt" rows="8"></textarea></label>
+          <label class="toggle-line"><input id="setting-fallback" type="checkbox" checked> 启用演示兜底数据</label>
+          <label class="toggle-line"><button type="button" class="primary-action" id="save-settings">保存设置</button></label>
+        </form>
+        <div class="settings-hint" id="settings-saved-hint"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="auth-overlay" id="auth-overlay" style="display:none">
+    <div class="auth-modal">
+      <h2 id="auth-title">登录</h2>
+      <p class="auth-subtitle" id="auth-subtitle">登录后可使用搜索和分析功能</p>
+      <form id="auth-form">
+        <label>用户名<input id="auth-username" type="text" required autocomplete="off"></label>
+        <label>密码<input id="auth-password" type="password" required autocomplete="off"></label>
+        <div class="auth-actions">
+          <button type="submit" class="primary-action" id="auth-submit">登录</button>
+          <button type="button" class="secondary-action" id="auth-switch">注册新账号</button>
+          <button type="button" class="secondary-action" id="auth-cancel">取消</button>
+        </div>
+        <p class="auth-hint" id="auth-hint"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
