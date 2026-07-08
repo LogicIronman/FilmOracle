@@ -114,19 +114,19 @@ CREATE TABLE IF NOT EXISTS user_history (
 -- 系统设置表
 CREATE TABLE IF NOT EXISTS app_setting (
     id BIGINT PRIMARY KEY DEFAULT 1,
-    ai_model VARCHAR(100) DEFAULT 'rule-based',
+    ai_model VARCHAR(100) DEFAULT 'moonshot-v1-8k',
     api_key VARCHAR(200),
     ai_prompt TEXT,
     crawler_api_url VARCHAR(500) DEFAULT 'https://m.douban.com/rexxar/api/v2',
-    comment_count INT DEFAULT 20,
-    request_timeout INT DEFAULT 10,
+    comment_count INT DEFAULT 100,
+    request_timeout INT DEFAULT 9,
     fallback_enabled BOOLEAN DEFAULT TRUE
 );
 
 -- 初始化默认设置
 INSERT INTO app_setting (id, ai_model, crawler_api_url, comment_count, request_timeout, fallback_enabled)
-VALUES (1, 'rule-based', 'https://m.douban.com/rexxar/api/v2', 20, 10, TRUE)
-ON DUPLICATE KEY UPDATE id = id;
+VALUES (1, 'moonshot-v1-8k', 'https://m.douban.com/rexxar/api/v2', 100, 9, TRUE)
+ON DUPLICATE KEY UPDATE ai_model = VALUES(ai_model), comment_count = VALUES(comment_count), request_timeout = VALUES(request_timeout);
 
 -- 默认管理员账号 (密码: admin123, SHA-256)
 INSERT INTO user_account (username, password_hash, role)

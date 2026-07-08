@@ -69,6 +69,25 @@ public class ApiServlet extends HttpServlet {
             return;
         }
 
+        // 系统设置 GET
+        if (full.equals("/api/settings")) {
+            Map<String, Object> user = AuthService.checkSession(req);
+            if (user == null) {
+                sendJson(resp, 401, Map.of("ok", false, "error", "请先登录"));
+                return;
+            }
+            boolean isAdmin = "admin".equals(user.get("role"));
+            Map<String, Object> settings = SettingService.getSettings();
+            if (!isAdmin) {
+                String apiKey = String.valueOf(settings.getOrDefault("apiKey", ""));
+                if (apiKey.length() > 6) {
+                    settings.put("apiKey", apiKey.substring(0, 6) + "***");
+                }
+            }
+            sendJson(resp, 200, Map.of("ok", true, "settings", settings));
+            return;
+        }
+
         try {
             Object result = null;
 
@@ -192,6 +211,33 @@ public class ApiServlet extends HttpServlet {
                 }
                 Map<String, Object> movieData = JsonUtil.getMapper().readValue(body.toString(), Map.class);
                 Map<String, Object> result = HistoryService.saveHistory(String.valueOf(histUser.get("username")), movieData);
+                sendJson(resp, 200, result);
+            } catch (Exception e) {
+                sendJson(resp, 500, Map.of("ok", false, "error", e.getMessage()));
+            }
+            return;
+        }
+
+        // POST /api/settings — 更新系统设置（仅管理员）
+        if (full.equals("/api/settings")) {
+            Map<String, Object> settingsUser = AuthService.checkSession(req);
+            if (settingsUser == null) {
+                sendJson(resp, 401, Map.of("ok", false, "error", "请先登录"));
+                return;
+            }
+            if (!"admin".equals(settingsUser.get("role"))) {
+                sendJson(resp, 403, Map.of("ok", false, "error", "仅管理员可修改设置"));
+                return;
+            }
+            try {
+                StringBuilder body = new StringBuilder();
+                try (BufferedReader reader = req.getReader()) {
+                    String line;
+                    while ((line = reader.readLine()) != null) body.append(line);
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> reqBody = JsonUtil.getMapper().readValue(body.toString(), Map.class);
+                Map<String, Object> result = SettingService.updateSettings(reqBody);
                 sendJson(resp, 200, result);
             } catch (Exception e) {
                 sendJson(resp, 500, Map.of("ok", false, "error", e.getMessage()));
