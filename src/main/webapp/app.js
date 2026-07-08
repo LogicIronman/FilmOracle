@@ -490,10 +490,11 @@ function renderResults(query, movies, meta = {}) {
     list.innerHTML = `<article class="comment-item"><p>没有搜索结果。请更换关键词，或检查豆瓣 API 是否可用。</p></article>`;
     return;
   }
-  currentSearchResults.forEach((movie) => {
+  currentSearchResults.forEach((movie, idx) => {
     const image = posterSrc(movie);
     const item = document.createElement("article");
     item.className = "result-item";
+    item.style.animationDelay = (idx * 60) + "ms";
     item.innerHTML = `
       <div class="mini-poster">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(movie.title)}海报" onerror="this.style.display='none'">` : ""}<span>${escapeHtml(movie.title)}</span></div>
       <div>
@@ -744,6 +745,12 @@ function buildLocalReview(comments, movie, keywords, positive, negative) {
 }
 
 function renderCharts() {
+  // Trigger panel refresh animation
+  document.querySelectorAll(".analysis-panel").forEach(panel => {
+    panel.classList.remove("refresh");
+    void panel.offsetWidth;
+    panel.classList.add("refresh");
+  });
   const maxKeyword = Math.max(1, ...currentAnalysis.keywords.map(([, count]) => Number(count) || 1));
   const cloudPositions = [
     [50, 50, -4], [28, 34, 7], [70, 34, -9], [24, 68, -6], [76, 68, 8],
@@ -756,24 +763,24 @@ function renderCharts() {
       const [left, top, rotate] = cloudPositions[index % cloudPositions.length];
       const size = 13 + Math.round((Number(count) || 1) / maxKeyword * 20);
       const opacity = 0.74 + Math.min(0.26, (Number(count) || 1) / maxKeyword * 0.26);
-      return `<span style="left:${left}%;top:${top}%;font-size:${size}px;opacity:${opacity};--rotate:${rotate}deg">${escapeHtml(word)}</span>`;
+      return `<span style="left:${left}%;top:${top}%;font-size:${size}px;opacity:${opacity};--rotate:${rotate}deg;--kw-opacity:${opacity};animation-delay:${index * 60}ms">${escapeHtml(word)}</span>`;
     }).join("")
     : `<span style="left:50%;top:50%;font-size:15px">等待评论分析</span>`;
 
   $("#rating-bars").innerHTML = renderRatingColumnChart(currentAnalysis.ratingDistribution);
-  $("#comparison-bars").innerHTML = currentAnalysis.comparison.map(([label, value]) => `
-    <div class="bar-row">
+  $("#comparison-bars").innerHTML = currentAnalysis.comparison.map(([label, value], idx) => `
+    <div class="bar-row" style="animation-delay:${idx * 50}ms">
       <span>${escapeHtml(label)}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${value}%"></span></span>
       <span>${value}</span>
     </div>
   `).join("");
 
-  const points = currentAnalysis.scatter.map((point) => {
+  const points = currentAnalysis.scatter.map((point, idx) => {
     const cx = 180 + point.x * 130;
     const cy = 188 - point.y * 156;
     const fill = point.sentiment === "正面" ? "#dcaa37" : point.sentiment === "负面" ? "#dc6966" : "#908f8b";
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="${fill}"><title>${escapeHtml(point.label)}</title></circle>`;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="${fill}" style="animation-delay:${idx * 30}ms"><title>${escapeHtml(point.label)}</title></circle>`;
   }).join("");
   $("#scatter-chart").innerHTML = `
     <svg viewBox="0 0 360 220" role="img" aria-label="情感散点图">
@@ -813,8 +820,8 @@ function renderCharts() {
         <polygon points="${polygon}" fill="rgba(217,119,87,.28)" stroke="#d97757" stroke-width="2"/>
       </svg>
       <div class="radar-score-list">
-        ${radarPairs.map(([label, score]) => `
-          <div class="radar-score-row">
+        ${radarPairs.map(([label, score], idx) => `
+          <div class="radar-score-row" style="animation-delay:${idx * 50}ms">
             <span>${escapeHtml(label)}</span>
             <span class="bar-track"><span class="bar-fill" style="width:${Math.max(0, Math.min(100, Number(score) * 10))}%"></span></span>
             <strong>${Number(score).toFixed(1)}</strong>
@@ -832,8 +839,8 @@ function renderRatingColumnChart(rows = []) {
   });
   return `
     <div class="rating-column-chart" role="img" aria-label="星级分布柱状图">
-      ${normalized.map(([label, value]) => `
-        <div class="rating-column">
+      ${normalized.map(([label, value], idx) => `
+        <div class="rating-column" style="animation-delay:${idx * 80}ms">
           <span class="rating-column-track"><span class="rating-column-fill" style="height:${Math.max(2, value)}%"></span></span>
           <span class="rating-column-value">${value}%</span>
           <span class="rating-column-label">${label}</span>
@@ -865,8 +872,8 @@ function renderComments() {
     const byKeyword = !keyword || [comment.text, comment.aspect, comment.quadrant, comment.user].some((value) => String(value || "").includes(keyword));
     return bySentiment && byKeyword;
   });
-  $("#comment-list").innerHTML = filtered.map((comment) => `
-    <article class="comment-item">
+  $("#comment-list").innerHTML = filtered.map((comment, idx) => `
+    <article class="comment-item" style="animation-delay:${idx * 40}ms">
       <p>${escapeHtml(comment.text)}</p>
       <div class="comment-meta">
         <span>${escapeHtml(comment.sentiment)}</span>
@@ -886,10 +893,10 @@ function renderHistory() {
     grid.innerHTML = `<article class="comment-item"><p>还没有历史记录。完成一次搜索分析后，可以点击“保存到历史”。</p></article>`;
     return;
   }
-  grid.innerHTML = items.map((movie) => {
+  grid.innerHTML = items.map((movie, idx) => {
     const image = posterSrc(movie);
     return `
-      <article class="history-item">
+      <article class="history-item" style="animation-delay:${idx * 60}ms">
         <div class="mini-poster">${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(movie.title)}海报" onerror="this.style.display='none'">` : ""}<span>${escapeHtml(movie.title)}</span></div>
         <h3>${escapeHtml(movie.title)}</h3>
         <p class="muted">已保存搜索、详情、评论与分析结果，二次进入优先复用缓存。</p>

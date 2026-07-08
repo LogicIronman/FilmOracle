@@ -1056,6 +1056,96 @@ textarea {
   to { transform: rotate(360deg); }
 }
 
+/* ===== Chart & List Animations ===== */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0); }
+  60%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes keywordFloatIn {
+  from { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rotate, 0deg)) scale(0.6); }
+  to   { opacity: var(--kw-opacity, 1); transform: translate(-50%, -50%) rotate(var(--rotate, 0deg)) scale(1); }
+}
+
+@keyframes radarDrawIn {
+  from { opacity: 0; transform: scale(0.5); transform-origin: center; }
+  to   { opacity: 1; transform: scale(1); transform-origin: center; }
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Chart panel refresh animation */
+.analysis-panel {
+  animation: panelFadeIn 0.5s ease both;
+}
+.analysis-panel.refresh {
+  animation: panelFadeIn 0.5s ease both;
+}
+
+/* Keyword cloud items */
+.keyword-cloud span {
+  animation: keywordFloatIn 0.5s ease both;
+}
+
+/* Scatter points */
+#scatter-chart circle {
+  animation: popIn 0.4s ease both;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* Radar polygon */
+#radar-chart polygon {
+  animation: radarDrawIn 0.6s ease both;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* Rating column fill - grow from bottom */
+.rating-column-fill {
+  animation: colGrow 0.5s ease both;
+}
+@keyframes colGrow {
+  from { height: 0 !important; }
+}
+
+/* Bar fill - grow from left */
+.bar-fill {
+  animation: barGrow 0.5s ease both;
+}
+@keyframes barGrow {
+  from { width: 0 !important; }
+}
+
+/* List item stagger animation */
+.result-item,
+.comment-item,
+.history-item,
+.bar-row,
+.rating-column {
+  animation: fadeInUp 0.4s ease both;
+}
+
+/* Radar score rows stagger */
+.radar-score-row {
+  animation: fadeInUp 0.3s ease both;
+}
+
 @media (max-width: 920px) {
   .topbar,
   .workspace-head,
