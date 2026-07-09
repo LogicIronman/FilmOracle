@@ -1,31 +1,102 @@
 // ─── 设置管理 ───
-const DEFAULT_PROMPT = `你是一位专业的电影评论分析师。请分析以下电影评论数据，输出纯JSON格式的分析结果（不要markdown，不要\`\`\`json标记）。
+const DEFAULT_PROMPT = `你是一位专业的电影评论分析师。请分析以下电影评论数据，输出纯 JSON 格式的分析结果（不要 markdown，不要 \`\`\`json 标记）。
 
 分析要求：
-1. 优点提炼：从评论中找出观众反复提及的亮点，具体到场景和细节，引用评论者的原话。
-2. 缺点与争议：诚实指出评论中暴露的问题，呈现评论间的分歧和张力。
-3. 横向比较：将本片与同类型、同题材作品比较，落到具体手法上。
-4. 总评：约400字综合评析，包含优缺点、横向比较、结论，说明适合什么样的观众。
-5. 关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"等通用词。
-6. 十维雷达图必须拉开差距，批评维度低到4-6分，突出维度可到8.5-9.6分。
-7. scatter中每条评论需要判断x(-1到1,情绪倾向)、y(0到1,情绪强度)、sentiment、emotionLabel(具体情绪如压抑/热血/感动/遗憾/治愈/孤独/过誉)、quadrant、weight(1-10)、quote(评论摘要前30字)。
-8. emotionMap需包含四象限统计(含count和percent)、情绪重心centroid(x,y,label)、summary(dominantEmotion,distributionSummary,interpretation)。
 
-输出JSON格式（纯JSON，不要markdown标记）：
+1. 优点提炼：
+从评论中找出观众反复提及的亮点，具体到场景、段落、人物关系、视听细节、叙事设计或主题表达，引用评论者的原话或观点。不要泛泛说"演技好、画面美、剧情好"。
+
+2. 缺点与争议：
+诚实指出评论中暴露的问题，例如节奏拖沓、人物动机不足、反转刻意、逻辑不通、表达用力、角色单薄、情绪操控明显等。如果评论间存在分歧，要呈现这种张力，不要回避。
+
+3. 横向比较：
+将本片与同类型、同题材、同导演或评论中提到的参照作品进行比较。比较必须落到具体手法上，例如叙事策略、视听表达、主题处理、人物塑造、类型完成度，而不是空泛地说"更深刻"或"更好"。
+
+4. AI 影评生成：
+请根据全部评论生成一段结构清晰、有判断力的 AI 影评。影评必须先概括观众对这部电影的整体评价，包括好评率、差评率、中性评价比例，以及评论整体是偏向一致好评、两极分化，还是褒贬不一。
+
+影评需要明确说明：
+- 观众总体怎么看这部电影，例如"多数观众认为本片完成度较高""评价呈现明显两极分化""好评集中但争议也很突出"。
+- 好评率是多少，必须引用 sentimentDistribution 或 summary 中的 positiveRate，不要模糊说"很多人喜欢"。
+- 出彩的地方在哪里：从评论中提炼观众反复提到的亮点，必须具体到场景、段落、人物关系、视听细节、叙事设计或主题表达。
+- 不出彩的地方在哪里：指出评论中暴露的问题，例如节奏、逻辑、人物、表达方式、视听手法、主题表达等方面的问题。
+- 如果评论存在分歧，要说明分歧点，例如同一个结尾有人认为高级，有人认为故弄玄虚。
+- 最后做整体评价：说明这部电影适合什么样的观众，它的主要价值在哪里，局限在哪里。不要使用"值得一看""还不错"这类空泛结论。
+
+影评语气要求：
+- 像专业影评人，不像营销文案。
+- 每个判断都要能从评论中找到依据。
+- 可以引用短句或概括评论者观点，但不要编造评论中没有的信息。
+- 优缺点比例要符合评论真实分布：好评率高就多写优点，差评率高就更充分写问题，两极分化就突出争议。
+- 字数约 400 字。
+
+5. 关键词：
+关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"等通用词。关键词应尽量体现这部电影独有的讨论点，例如具体场景、人物关系、叙事结构、情绪体验、争议桥段、视听特征等。
+
+6. 十维雷达图：
+十维雷达图必须拉开差距，不要所有维度都集中在 8 分附近。评论明显批评的维度应低到 4-6 分，评论明显认可的突出维度可到 8.5-9.6 分。分数必须根据评论证据判断，而不是平均分配。
+
+十维包括：剧本、导演、表演、摄影、剪辑、声音、美术、特效、主题、完成度。
+
+7. 情绪散点 scatter：
+scatter 中每条评论都需要判断：
+- x：情绪倾向，范围 -1 到 1。-1 表示强烈消极，0 表示中性，1 表示强烈积极。
+- y：情绪强度，范围 0 到 1。0 表示情绪平静，1 表示情绪强烈。
+- sentiment：正面、负面、中性。
+- emotionLabel：具体情绪标签，例如压抑、热血、感动、遗憾、治愈、孤独、过誉、不安、震撼、愤怒、失望、轻松。
+- quadrant：所属象限。
+- weight：点大小权重，范围 1-10，可根据情绪强度、评论点赞数、评论代表性综合判断。
+- quote：该评论摘要或原话片段，控制在 30 字以内。
+- index：评论序号。
+
+8. 观众情绪分布图 emotionMap：
+emotionMap 需要基于 scatter 统计四象限分布，包含：
+- quadrants：四象限统计，每个象限包含 name、position、count、percent、description。
+- centroid：情绪重心，包含 x、y、label，用于说明整部电影评论的整体情绪偏向。
+- summary：情绪分布总结，包含 dominantEmotion、distributionSummary、interpretation。
+
+四象限默认定义：
+- leftTop：压抑/惊悚，高强度负面情绪，例如恐惧、压抑、窒息、不安、震怒。
+- rightTop：热血/高燃，高强度正面情绪，例如震撼、兴奋、爽感、热血、强烈感动。
+- leftBottom：孤独/克制，低到中强度负面或内敛情绪，例如遗憾、孤独、冷感、克制、怅惘。
+- rightBottom：治愈/轻松，低到中强度正面情绪，例如温暖、治愈、轻松、回甘、舒适。
+
+9. 情感分布：
+根据全部评论计算 positive、negative、neutral 的百分比，三者总和必须为 100。
+
+10. 星级分布：
+根据评论星级计算 5 星、4 星、3 星、2 星、1 星占比，百分比总和必须为 100。
+
+11. 输出要求：
+只输出一个合法 JSON 对象。不要输出解释。不要输出 markdown。不要输出代码块标记。不要在 JSON 前后添加任何多余文字。所有百分比使用整数。所有分数保留 1 位小数。所有坐标保留 2 位小数。
+
+输出 JSON 格式：
+
 {
-  "keywords": [["关键词", 次数], ...],
+  "keywords": [["关键词", 次数]],
   "ratingDistribution": [["5星", 百分比], ["4星", 百分比], ["3星", 百分比], ["2星", 百分比], ["1星", 百分比]],
   "comparison": [["本片评分", 值], ["同类型热度", 值], ["评价人数", 值], ["正向情绪", 值]],
   "radar": [["剧本", 分数], ["导演", 分数], ["表演", 分数], ["摄影", 分数], ["剪辑", 分数], ["声音", 分数], ["美术", 分数], ["特效", 分数], ["主题", 分数], ["完成度", 分数]],
-  "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "情绪标签", "quadrant": "象限", "weight": 权重, "quote": "评论摘要", "index": 序号}, ...],
+  "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "具体情绪标签", "quadrant": "象限名称", "weight": 权重, "quote": "评论摘要或原话片段", "index": 序号}],
   "emotionMap": {
-    "quadrants": [{"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "描述"}, ...],
-    "centroid": {"x": 值, "y": 值, "label": "重心说明"},
-    "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "分布总结", "interpretation": "解读"}
+    "quadrants": [
+      {"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "该象限代表高强度负面情绪，例如恐惧、压抑、窒息、不安"},
+      {"name": "热血/高燃", "position": "rightTop", "count": 数量, "percent": 百分比, "description": "该象限代表高强度正面情绪，例如震撼、兴奋、爽感、热血"},
+      {"name": "孤独/克制", "position": "leftBottom", "count": 数量, "percent": 百分比, "description": "该象限代表低到中强度负面或内敛情绪，例如遗憾、孤独、冷感、克制"},
+      {"name": "治愈/轻松", "position": "rightBottom", "count": 数量, "percent": 百分比, "description": "该象限代表低到中强度正面情绪，例如温暖、治愈、轻松、回甘"}
+    ],
+    "centroid": {"x": 值, "y": 值, "label": "情绪重心说明"},
+    "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "一句话说明观众情绪主要集中在哪些区域", "interpretation": "说明这张情绪图反映了观众怎样的观影体验"}
   },
   "sentimentDistribution": {"positive": 百分比, "negative": 百分比, "neutral": 百分比},
-  "summary": {"positiveRate": 值, "negativeRate": 值, "neutralRate": 值, "keywordsSummary": "关键词摘要", "mainControversy": "争议点", "totalComments": 数量},
-  "review": "400字综合评析"
+  "summary": {"positiveRate": 值, "negativeRate": 值, "neutralRate": 值, "keywordsSummary": "关键词摘要", "mainControversy": "主要争议点", "totalComments": 数量},
+  "review": {
+    "overallReception": "观众整体评价概括，必须包含好评率、差评率、中性比例，以及整体口碑倾向",
+    "highlightPoints": ["具体出彩点1，带评论依据", "具体出彩点2，带评论依据"],
+    "weaknesses": ["不出彩或争议点1，带评论依据", "不出彩或争议点2，带评论依据"],
+    "finalJudgement": "整体评价：适合什么观众、主要价值、局限在哪里",
+    "fullText": "约400字完整AI影评"
+  }
 }`;
 
 // ─── 设置管理（数据库后端） ───
@@ -485,11 +556,33 @@ async function handleAuthSubmit(e) {
           body: JSON.stringify({ username, password })
         });
         const loginData = await loginResp.json();
-        if (loginData.ok) { currentUser = loginData.user; updateAuthUI(); hideAuthModal(); }
+        if (loginData.ok) {
+          currentUser = loginData.user; updateAuthUI(); hideAuthModal();
+          await loadHistoryFromApi();
+          renderHistory();
+          await loadSettingsFromApi();
+          loadSettingsToForm();
+        }
         else { hint.textContent = "注册成功，请手动登录"; submitBtn.textContent = "登录"; }
-      } else { currentUser = data.user; updateAuthUI(); hideAuthModal(); }
+      } else {
+        currentUser = data.user; updateAuthUI(); hideAuthModal();
+        await loadHistoryFromApi();
+        renderHistory();
+        await loadSettingsFromApi();
+        loadSettingsToForm();
+      }
     } else { hint.textContent = data.error || "操作失败"; }
   } catch (err) { hint.textContent = "网络错误: " + err.message; }
+}
+
+async function loadHistoryFromApi() {
+  try {
+    const resp = await fetch("/api/history");
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.ok) { history = data.history || []; }
+    }
+  } catch {}
 }
 
 function requireAuth() {
@@ -968,16 +1061,55 @@ function renderRatingColumnChart(rows = []) {
 function renderReview() {
   const reviewEl = $("#ai-review");
   const tagEl = $("#review-tag");
-  if (currentAnalysis.review) {
-    reviewEl.innerHTML = `<p>${escapeHtml(currentAnalysis.review)}</p>`;
+  const review = currentAnalysis.review;
+  if (review) {
     const isAi = currentAnalysis.engine && currentAnalysis.engine.startsWith("ai");
     tagEl.textContent = isAi ? "AI评析" : "本地评析";
     tagEl.className = isAi ? "status-tag running" : "status-tag neutral";
+
+    // 检查是否为对象格式（新版AI返回）
+    if (typeof review === "object" && review.fullText) {
+      const highlights = Array.isArray(review.highlightPoints) ? review.highlightPoints : [];
+      const weaknesses = Array.isArray(review.weaknesses) ? review.weaknesses : [];
+      reviewEl.innerHTML = `
+        ${review.overallReception ? `<p style="font-weight:700;color:var(--accent-active);margin-bottom:10px;">${escapeHtml(review.overallReception)}</p>` : ""}
+        ${highlights.length ? `<p style="margin:8px 0;"><strong style="color:var(--positive);">出彩：</strong>${highlights.map(h => escapeHtml(h)).join("；")}</p>` : ""}
+        ${weaknesses.length ? `<p style="margin:8px 0;"><strong style="color:var(--negative);">不足：</strong>${weaknesses.map(w => escapeHtml(w)).join("；")}</p>` : ""}
+        ${review.finalJudgement ? `<p style="margin:8px 0;font-style:italic;color:var(--muted);">${escapeHtml(review.finalJudgement)}</p>` : ""}
+        <p style="margin-top:12px;text-indent:2em;line-height:1.8;">${escapeHtml(review.fullText)}</p>
+      `;
+    } else if (typeof review === "string") {
+      // 旧格式（字符串）或规则引擎生成
+      try {
+        const parsed = JSON.parse(review);
+        if (parsed && parsed.fullText) {
+          renderReviewObject(parsed, reviewEl);
+        } else {
+          reviewEl.innerHTML = `<p>${escapeHtml(review)}</p>`;
+        }
+      } catch {
+        reviewEl.innerHTML = `<p>${escapeHtml(review)}</p>`;
+      }
+    } else {
+      reviewEl.innerHTML = `<p class="muted">评析格式异常。</p>`;
+    }
   } else {
     reviewEl.innerHTML = `<p class="muted">点击「获取并 AI 分析」后，此处将显示基于评论数据的客观评析。</p>`;
     tagEl.textContent = "待生成";
     tagEl.className = "status-tag neutral";
   }
+}
+
+function renderReviewObject(review, el) {
+  const highlights = Array.isArray(review.highlightPoints) ? review.highlightPoints : [];
+  const weaknesses = Array.isArray(review.weaknesses) ? review.weaknesses : [];
+  el.innerHTML = `
+    ${review.overallReception ? `<p style="font-weight:700;color:var(--accent-active);margin-bottom:10px;">${escapeHtml(review.overallReception)}</p>` : ""}
+    ${highlights.length ? `<p style="margin:8px 0;"><strong style="color:var(--positive);">出彩：</strong>${highlights.map(h => escapeHtml(h)).join("；")}</p>` : ""}
+    ${weaknesses.length ? `<p style="margin:8px 0;"><strong style="color:var(--negative);">不足：</strong>${weaknesses.map(w => escapeHtml(w)).join("；")}</p>` : ""}
+    ${review.finalJudgement ? `<p style="margin:8px 0;font-style:italic;color:var(--muted);">${escapeHtml(review.finalJudgement)}</p>` : ""}
+    <p style="margin-top:12px;text-indent:2em;line-height:1.8;">${escapeHtml(review.fullText)}</p>
+  `;
 }
 
 function renderComments() {
@@ -1282,7 +1414,7 @@ async function loadCommentsAndAnalyze(runAnalysis = false) {
   appendTask("> === 任务完成 ===", "done");
 }
 
-function importMovieFromForm(form) {
+async function importMovieFromForm(form) {
   const formData = new FormData(form);
   const title = (formData.get("title") || "").trim();
   if (!title) {
@@ -1303,19 +1435,108 @@ function importMovieFromForm(form) {
     source: formData.get("source") || "导入评论文件"
   };
   currentMovie = importedMovie;
-  currentComments = [];
-  currentAnalysis = emptyAnalysis();
-  renderDetail(importedMovie);
-  renderCharts();
-  renderComments();
-  renderReview();
-  showView("detail");
-  setTask([
-    "> import: 表单已提交",
-    `> movie: ${importedMovie.title}`,
-    "> comments: 暂无评论数据，请获取评论或手动导入",
-    "> charts: 等待评论分析后生成"
-  ], "import ready");
+
+  // 读取并解析上传的评论文件
+  const fileInput = form.querySelector('input[type="file"]');
+  let parsedComments = [];
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    const file = fileInput.files[0];
+    const text = await file.text();
+    parsedComments = parseCommentFile(text, file.name);
+  }
+
+  if (parsedComments.length === 0) {
+    // 没有评论数据，显示空白图表
+    currentComments = [];
+    currentAnalysis = emptyAnalysis();
+    renderDetail(importedMovie);
+    renderCharts();
+    renderComments();
+    renderReview();
+    showView("detail");
+    setTask([
+      "> import: 表单已提交",
+      `> movie: ${importedMovie.title}`,
+      "> comments: 未检测到评论数据，请上传 CSV/TXT 文件或通过搜索获取评论",
+      "> charts: 等待评论分析后生成"
+    ], "import ready");
+    showToast("未检测到评论文件，请上传 CSV 或 TXT 文件");
+  } else {
+    // 有评论数据，执行规则引擎分析
+    currentComments = parsedComments;
+    currentAnalysis = buildAnalysis(currentComments, importedMovie);
+    renderDetail(importedMovie);
+    renderCharts();
+    renderComments();
+    renderReview();
+    showView("detail");
+    setTask([
+      "> import: 评论文件解析完成",
+      `> movie: ${importedMovie.title}`,
+      `> comments: ${parsedComments.length} 条评论已导入`,
+      `> analysis: 规则引擎分析完成（可点击「获取并AI分析」升级为AI分析）`
+    ], "import ready");
+    showToast(`已导入 ${parsedComments.length} 条评论`);
+  }
+}
+
+// 解析评论文件（CSV/TXT）
+function parseCommentFile(text, fileName) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length === 0) return [];
+
+  const comments = [];
+  const isCsv = fileName.toLowerCase().endsWith(".csv");
+
+  // 检测CSV头部
+  let startIdx = 0;
+  let textCol = 0, ratingCol = -1, userCol = -1;
+  if (isCsv && lines[0].includes(",")) {
+    const header = lines[0].toLowerCase().split(",");
+    for (let i = 0; i < header.length; i++) {
+      if (header[i].includes("text") || header[i].includes("comment") || header[i].includes("评")) textCol = i;
+      if (header[i].includes("rating") || header[i].includes("star") || header[i].includes("星")) ratingCol = i;
+      if (header[i].includes("user") || header[i].includes("name") || header[i].includes("用户")) userCol = i;
+    }
+    // 如果第一行看起来是数据而非头部
+    if (!header[textCol].includes("text") && !header[textCol].includes("comment")) {
+      startIdx = 0;
+    } else {
+      startIdx = 1;
+    }
+  }
+
+  for (let i = startIdx; i < lines.length; i++) {
+    let parts, commentText, rating = 3, user = "导入用户";
+    if (isCsv) {
+      // 简单CSV解析（不处理引号内逗号）
+      parts = lines[i].split(",");
+      commentText = (parts[textCol] || "").trim().replace(/^"|"$/g, "");
+      if (ratingCol >= 0 && parts[ratingCol]) {
+        const r = parseInt(parts[ratingCol].replace(/[^0-5]/g, ""));
+        if (r >= 1 && r <= 5) rating = r;
+      }
+      if (userCol >= 0 && parts[userCol]) user = parts[userCol].trim().replace(/^"|"$/g, "");
+    } else {
+      // TXT：整行为评论内容
+      commentText = lines[i].trim();
+      // 尝试从行首提取星级 如 "5星 好看"
+      const starMatch = commentText.match(/^([1-5])\s*星\s*(.*)/);
+      if (starMatch) { rating = parseInt(starMatch[1]); commentText = starMatch[2]; }
+    }
+    if (commentText.length >= 2) {
+      comments.push({
+        id: `import-comment-${i}`,
+        text: commentText,
+        ratingValue: rating,
+        star: rating + "星",
+        user,
+        voteCount: 0,
+        createdAt: null
+      });
+    }
+  }
+  return comments;
 }
 
 function bindEvents() {
@@ -1410,16 +1631,8 @@ async function init() {
     }
   }
   if (currentUser) {
-    try {
-      const resp = await fetch("/api/history");
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.ok) {
-          history = data.history || [];
-          renderHistory();
-        }
-      }
-    } catch {}
+    await loadHistoryFromApi();
+    renderHistory();
   }
 }
 

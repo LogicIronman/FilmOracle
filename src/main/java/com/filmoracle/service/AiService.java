@@ -19,33 +19,74 @@ public class AiService {
      * 默认 AI 提示词（详尽版）
      */
     public static final String DEFAULT_PROMPT = """
-        你是一位专业的电影评论分析师。请分析以下电影评论数据，输出纯JSON格式的分析结果（不要markdown，不要```json标记）。
+        你是一位专业的电影评论分析师。请分析以下电影评论数据，输出纯 JSON 格式的分析结果（不要 markdown，不要 ```json 标记）。
 
         分析要求：
-        1. 优点提炼：从评论中找出观众反复提及的亮点。不要泛泛说"演技好、画面美"，要具体到哪个场景、哪个细节被称赞，引用评论者的原话或观点。
-        2. 缺点与争议：诚实指出评论中暴露的问题。如果评论间存在分歧，要呈现这种张力。
-        3. 横向比较：将本片与同类型、同题材作品比较，落到具体手法上。
-        4. 总评：约400字综合评析，包含优缺点、横向比较、结论。
-        5. 关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"等通用词。
-        6. 十维雷达图必须拉开差距，批评维度低到4-6分，突出维度可到8.5-9.6分。
-        7. scatter中每条评论需要判断x(-1到1, 情绪倾向)、y(0到1, 情绪强度)、sentiment、emotionLabel(具体情绪如压抑/热血/感动/遗憾/治愈/孤独/过誉)、quadrant、weight(1-10)、quote(评论摘要前30字)。
-        8. emotionMap需包含四象限统计(含count和percent)、情绪重心centroid(x,y,label)、summary(dominantEmotion, distributionSummary, interpretation)。
 
-        输出JSON格式（纯JSON，不要markdown标记）：
+        1. 优点提炼：
+        从评论中找出观众反复提及的亮点，具体到场景、段落、人物关系、视听细节、叙事设计或主题表达，引用评论者的原话或观点。不要泛泛说"演技好、画面美、剧情好"。
+
+        2. 缺点与争议：
+        诚实指出评论中暴露的问题，例如节奏拖沓、人物动机不足、反转刻意、逻辑不通、表达用力、角色单薄、情绪操控明显等。如果评论间存在分歧，要呈现这种张力，不要回避。
+
+        3. 横向比较：
+        将本片与同类型、同题材、同导演或评论中提到的参照作品进行比较。比较必须落到具体手法上，例如叙事策略、视听表达、主题处理、人物塑造、类型完成度，而不是空泛地说"更深刻"或"更好"。
+
+        4. AI 影评生成：
+        请根据全部评论生成一段结构清晰、有判断力的 AI 影评。影评必须先概括观众对这部电影的整体评价，包括好评率、差评率、中性评价比例，以及评论整体是偏向一致好评、两极分化，还是褒贬不一。
+
+        影评需要明确说明：
+        - 观众总体怎么看这部电影。
+        - 好评率是多少，必须引用 sentimentDistribution 或 summary 中的 positiveRate。
+        - 出彩的地方在哪里：从评论中提炼观众反复提到的亮点。
+        - 不出彩的地方在哪里：指出评论中暴露的问题。
+        - 如果评论存在分歧，要说明分歧点。
+        - 最后做整体评价：说明这部电影适合什么样的观众，主要价值在哪里，局限在哪里。
+
+        影评语气要求：像专业影评人，每个判断都要能从评论中找到依据，优缺点比例要符合评论真实分布，字数约 400 字。
+
+        5. 关键词：
+        关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"等通用词。
+
+        6. 十维雷达图：
+        十维雷达图必须拉开差距，批评维度低到 4-6 分，突出维度可到 8.5-9.6 分。十维包括：剧本、导演、表演、摄影、剪辑、声音、美术、特效、主题、完成度。
+
+        7. 情绪散点 scatter：
+        每条评论需要判断 x(-1到1,情绪倾向)、y(0到1,情绪强度)、sentiment、emotionLabel(具体情绪)、quadrant、weight(1-10)、quote(评论摘要前30字)、index。
+
+        8. 观众情绪分布图 emotionMap：
+        基于 scatter 统计四象限分布，包含 quadrants(每个含name,position,count,percent,description)、centroid(x,y,label)、summary(dominantEmotion,distributionSummary,interpretation)。
+
+        9. 情感分布：positive、negative、neutral 百分比总和必须为 100。
+        10. 星级分布：5星到1星占比总和必须为 100。
+        11. 输出要求：只输出一个合法 JSON 对象，不要输出解释、markdown、代码块标记。所有百分比使用整数，分数保留 1 位小数，坐标保留 2 位小数。
+
+        输出 JSON 格式：
         {
-          "keywords": [["关键词", 次数], ...],
+          "keywords": [["关键词", 次数]],
           "ratingDistribution": [["5星", 百分比], ["4星", 百分比], ["3星", 百分比], ["2星", 百分比], ["1星", 百分比]],
           "comparison": [["本片评分", 值], ["同类型热度", 值], ["评价人数", 值], ["正向情绪", 值]],
           "radar": [["剧本", 分数], ["导演", 分数], ["表演", 分数], ["摄影", 分数], ["剪辑", 分数], ["声音", 分数], ["美术", 分数], ["特效", 分数], ["主题", 分数], ["完成度", 分数]],
-          "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "情绪标签", "quadrant": "象限", "weight": 权重, "quote": "评论摘要", "index": 序号}, ...],
+          "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "情绪标签", "quadrant": "象限", "weight": 权重, "quote": "评论摘要", "index": 序号}],
           "emotionMap": {
-            "quadrants": [{"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "描述"}, ...],
-            "centroid": {"x": 值, "y": 值, "label": "重心说明"},
-            "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "分布总结", "interpretation": "解读"}
+            "quadrants": [
+              {"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "高强度负面情绪"},
+              {"name": "热血/高燃", "position": "rightTop", "count": 数量, "percent": 百分比, "description": "高强度正面情绪"},
+              {"name": "孤独/克制", "position": "leftBottom", "count": 数量, "percent": 百分比, "description": "低强度负面或内敛情绪"},
+              {"name": "治愈/轻松", "position": "rightBottom", "count": 数量, "percent": 百分比, "description": "低到中强度正面情绪"}
+            ],
+            "centroid": {"x": 值, "y": 值, "label": "情绪重心说明"},
+            "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "分布总结", "interpretation": "观影体验解读"}
           },
           "sentimentDistribution": {"positive": 百分比, "negative": 百分比, "neutral": 百分比},
           "summary": {"positiveRate": 值, "negativeRate": 值, "neutralRate": 值, "keywordsSummary": "关键词摘要", "mainControversy": "争议点", "totalComments": 数量},
-          "review": "400字综合评析"
+          "review": {
+            "overallReception": "观众整体评价概括，包含好评率、差评率、中性比例",
+            "highlightPoints": ["出彩点1", "出彩点2"],
+            "weaknesses": ["不足点1", "不足点2"],
+            "finalJudgement": "整体评价：适合什么观众、价值、局限",
+            "fullText": "约400字完整AI影评"
+          }
         }
         """;
 
@@ -159,8 +200,16 @@ public class AiService {
                 result.setSummary(summary);
             }
 
-            // review
-            result.setReview(JsonUtil.getStr(aiResult, "review"));
+            // review - 可能是字符串（旧格式）或对象（新格式）
+            Object reviewObj = aiResult.get("review");
+            if (reviewObj instanceof Map) {
+                // 新格式：对象，转为JSON字符串存储
+                result.setReview(JsonUtil.toJson(reviewObj));
+            } else if (reviewObj instanceof String) {
+                result.setReview((String) reviewObj);
+            } else {
+                result.setReview(JsonUtil.getStr(aiResult, "review"));
+            }
 
             // analyzedComments - 用规则引擎补充每条评论的分析
             result.setAnalyzedComments(buildAnalyzedComments(comments));

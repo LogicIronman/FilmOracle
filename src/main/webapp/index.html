@@ -194,16 +194,11 @@
           <section class="upload-panel">
             <h3>评论文件</h3>
             <label class="upload-box">
-              <input type="file" accept=".csv,.xlsx,.txt">
-              <span>选择 CSV / Excel / TXT</span>
-              <small>当前阶段展示导入流程和分析效果，文件解析会在后续阶段接入。</small>
+              <input type="file" accept=".csv,.txt">
+              <span>选择 CSV / TXT</span>
+              <small>CSV需包含评论文本列，TXT每行一条评论。支持行首星级标注如"5星 好看"。</small>
             </label>
-            <div class="import-stats">
-              <span><strong>1,240</strong> 可导入</span>
-              <span><strong>38</strong> 重复</span>
-              <span><strong>0</strong> 错误</span>
-            </div>
-            <button class="primary-action" type="submit">生成分析原型</button>
+            <button class="primary-action" type="submit">导入并分析</button>
           </section>
         </form>
       </section>
