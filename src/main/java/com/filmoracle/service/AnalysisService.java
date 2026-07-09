@@ -439,19 +439,19 @@ public class AnalysisService {
 
     // ─── 方面级情感分析 ───
     private static final String[][] ASPECT_PATTERNS = {
-        {"剧情", "故事|情节|叙事|剧本|线索|伏笔|反转|逻辑|设定|桥段|套路"},
-        {"演技", "演技|表演|演员|角色|饰演|演绎|主角|配角|群像"},
-        {"视听", "画面|镜头|摄影|视效|特效|色彩|构图|光影|视觉|画面"},
-        {"节奏", "节奏|拖沓|紧凑|缓慢|快|慢|剪辑|转折|推进|松散"},
-        {"主题", "主题|思想|深度|内涵|隐喻|象征|哲学|意义|表达|探讨"},
-        {"配乐", "配乐|音乐|音效|BGM|主题曲|背景音|原声|配乐"},
-        {"美术", "美术|布景|服装|道具|场景|美术设计|造型|服化道"},
-        {"结尾", "结尾|结局|最后|收尾|尾声|终章|结局"}
+        {"剧情", "故事|情节|叙事|剧本|线索|伏笔|反转|逻辑|设定|桥段|套路|剧情|开头|铺垫|前半|后半|世界观|设定|梗|虐心|催泪|狗血|俗套"},
+        {"演技", "演技|表演|演员|角色|饰演|演绎|主角|配角|群像|表演力|刻画|塑造|眼神|微表情|出戏|入戏|台词功|演技在线|演得好|演得"},
+        {"视听", "画面|镜头|摄影|视效|特效|色彩|构图|光影|视觉|画面感|大片感|视觉冲击|美学|质感|帧|截图|名场面|视觉盛宴"},
+        {"节奏", "节奏|拖沓|紧凑|缓慢|快|慢|剪辑|转折|推进|松散|冗长|注水|拖戏|拖拉|太长|太慢|太快|高能|停不下来|一气呵成"},
+        {"主题", "主题|思想|深度|内涵|隐喻|象征|哲学|意义|表达|探讨|女性|男权|社会|现实|阶层|批判|反思|启示|价值观|立场"},
+        {"配乐", "配乐|音乐|音效|BGM|主题曲|背景音|原声|OST|配乐感|音乐性|配乐好|音乐响|BGM太"},
+        {"美术", "美术|布景|服装|道具|场景|美术设计|造型|服化道|审美|服化|妆造|美术风格|置景|年代感|服化精美"},
+        {"结尾", "结尾|结局|最后|收尾|尾声|终章|收场|落幕|结局|结尾好|结尾烂|HE|BE|开放式"}
     };
-    private static final Pattern STRONG_POSITIVE = Pattern.compile("封神|绝了|震撼|神作|标杆|教科书|天花板|无可挑剔|完美|杰作");
-    private static final Pattern STRONG_NEGATIVE = Pattern.compile("崩坏|败笔|烂尾|灾难|一塌糊涂|惨不忍睹|狗屁|垃圾|烂片|圾");
-    private static final Pattern MODERATE_POSITIVE = Pattern.compile("好看|出色|精彩|到位|扎实|细腻|惊艳|亮眼|加分");
-    private static final Pattern MODERATE_NEGATIVE = Pattern.compile("不行|不足|欠缺|薄弱|生硬|尴尬|刻意|拖沓|无聊|失望|减分");
+    private static final Pattern STRONG_POSITIVE = Pattern.compile("封神|绝了|震撼|神作|标杆|教科书|天花板|无可挑剔|完美|杰作| masterpiece |大师|天花板|封顶|绝赞|叹为观止");
+    private static final Pattern STRONG_NEGATIVE = Pattern.compile("崩坏|败笔|烂尾|灾难|一塌糊涂|惨不忍睹|狗屁|垃圾|烂片|圾|拉胯|稀烂|车祸|魔幻|离谱|恶心");
+    private static final Pattern MODERATE_POSITIVE = Pattern.compile("好看|出色|精彩|到位|扎实|细腻|惊艳|亮眼|加分|不错|扎实|舒服|流畅|自然|真诚|用心");
+    private static final Pattern MODERATE_NEGATIVE = Pattern.compile("不行|不足|欠缺|薄弱|生硬|尴尬|刻意|拖沓|无聊|失望|减分|违和|出戏|可惜|遗憾|平庸|俗套|老套");
 
     private static double calculateAspectPolarity(Comment c, String aspect) {
         String text = c.getText();
@@ -480,46 +480,104 @@ public class AnalysisService {
         return t.length() <= maxLen ? t : t.substring(0, maxLen) + "...";
     }
 
-    // ─── 方面级散点（每条评论按提及方面拆分）───
+    // ─── 方面级散点（聚合相似情感评论）───
+    // 策略：对每条评论检测提及的方面，计算该方面的polarity和intensity，
+    // 然后将相同方面+相近情感(polarity四舍五入到0.5，intensity四舍五入到0.5)的评论聚合为一个点，
+    // votes = 聚合的评论条数（表示有多少条评论表达了相似情感），点越大代表越多评论持相同看法
     private static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
-        List<Map<String, Object>> scatter = new ArrayList<>();
-        java.util.Random jitter = new java.util.Random(42);
+        Map<String, Map<String, Object>> clusters = new LinkedHashMap<>();
+
         for (Comment c : comments) {
             String text = c.getText();
+            if (text == null || text.isEmpty()) continue;
+            boolean anyAspect = false;
+
             for (String[] aspectRule : ASPECT_PATTERNS) {
                 String aspect = aspectRule[0];
                 Pattern p = Pattern.compile(aspectRule[1]);
                 if (!p.matcher(text).find()) continue;
+                anyAspect = true;
+
                 double polarity = calculateAspectPolarity(c, aspect);
                 double intensity = calculateAspectIntensity(c);
-                double jx = (jitter.nextDouble() - 0.5) * 0.3;
-                double jy = (jitter.nextDouble() - 0.5) * 0.2;
-                polarity = Math.max(-5.0, Math.min(5.0, polarity + jx));
-                intensity = Math.max(0.0, Math.min(5.0, intensity + jy));
-                Map<String, Object> point = new LinkedHashMap<>();
-                point.put("aspect", aspect);
-                point.put("polarity", Math.round(polarity * 10) / 10.0);
-                point.put("intensity", Math.round(intensity * 10) / 10.0);
-                point.put("votes", c.getVoteCount());
-                point.put("text", getCommentExcerpt(text, 60));
-                scatter.add(point);
+                // 四舍五入到0.5精度，使相似情感的评论聚合
+                double rp = Math.round(polarity * 2) / 2.0;
+                double ri = Math.round(intensity * 2) / 2.0;
+                String key = aspect + "_" + rp + "_" + ri;
+
+                aggregateCluster(clusters, key, aspect, rp, ri, c, text);
             }
-            if (scatter.isEmpty()) {
+
+            // 如果没有匹配到任何方面，归入"剧情"默认方面
+            if (!anyAspect) {
                 double polarity = calculateAspectPolarity(c, "剧情");
                 double intensity = calculateAspectIntensity(c);
-                Map<String, Object> point = new LinkedHashMap<>();
-                point.put("aspect", "剧情");
-                point.put("polarity", Math.round(polarity * 10) / 10.0);
-                point.put("intensity", Math.round(intensity * 10) / 10.0);
-                point.put("votes", c.getVoteCount());
-                point.put("text", getCommentExcerpt(text, 60));
-                scatter.add(point);
+                double rp = Math.round(polarity * 2) / 2.0;
+                double ri = Math.round(intensity * 2) / 2.0;
+                String key = "剧情_" + rp + "_" + ri;
+                aggregateCluster(clusters, key, "剧情", rp, ri, c, text);
             }
         }
+
+        // 转为列表，加微抖动防完全重叠
+        List<Map<String, Object>> scatter = new ArrayList<>();
+        java.util.Random jitter = new java.util.Random(42);
+        for (Map<String, Object> cluster : clusters.values()) {
+            double jx = (jitter.nextDouble() - 0.5) * 0.3;
+            double jy = (jitter.nextDouble() - 0.5) * 0.2;
+            double pol = Math.max(-5.0, Math.min(5.0, Number(cluster.get("polarity")) + jx));
+            double inten = Math.max(0.0, Math.min(5.0, Number(cluster.get("intensity")) + jy));
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("aspect", cluster.get("aspect"));
+            point.put("polarity", Math.round(pol * 10) / 10.0);
+            point.put("intensity", Math.round(inten * 10) / 10.0);
+            point.put("votes", cluster.get("votes"));
+            point.put("text", cluster.get("text"));
+            scatter.add(point);
+        }
+
+        // 确保至少有数据
+        if (scatter.isEmpty()) {
+            Map<String, Object> point = new LinkedHashMap<>();
+            point.put("aspect", "剧情");
+            point.put("polarity", 0.0);
+            point.put("intensity", 1.0);
+            point.put("votes", 1);
+            point.put("text", "");
+            scatter.add(point);
+        }
+
+        System.out.println("[SCATTER] " + comments.size() + " comments -> " + scatter.size() + " aggregated clusters");
         return scatter;
     }
 
-    // ─── 情绪分布图（新四象限）───
+    @SuppressWarnings("unchecked")
+    private static void aggregateCluster(Map<String, Map<String, Object>> clusters,
+            String key, String aspect, double rp, double ri, Comment c, String text) {
+        Map<String, Object> cluster = clusters.get(key);
+        if (cluster == null) {
+            cluster = new LinkedHashMap<>();
+            cluster.put("aspect", aspect);
+            cluster.put("polarity", rp);
+            cluster.put("intensity", ri);
+            cluster.put("votes", 0);
+            cluster.put("_maxVotes", -1);
+            cluster.put("text", "");
+            clusters.put(key, cluster);
+        }
+        // votes = 聚合的评论条数
+        int prevCount = ((Number) cluster.get("votes")).intValue();
+        cluster.put("votes", prevCount + 1);
+        // 选点赞最多的评论作为代表文本
+        int maxV = ((Number) cluster.get("_maxVotes")).intValue();
+        if (c.getVoteCount() > maxV) {
+            cluster.put("_maxVotes", c.getVoteCount());
+            cluster.put("text", getCommentExcerpt(text, 60));
+        }
+    }
+
+    // ─── 情绪分布图（新四象限，加权统计）───
+    // 使用散点聚合数据，按 votes（聚合评论数）加权统计象限，使统计结果反映真实评论分布
     private static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
         Map<String, Object> emotionMap = new LinkedHashMap<>();
         Map<String, String> axis = new LinkedHashMap<>();
@@ -527,32 +585,35 @@ public class AnalysisService {
         axis.put("y", "平淡 → intensity → 强烈");
         emotionMap.put("axis", axis);
 
-        // 用散点数据统计象限
+        // 用散点数据统计象限（按votes加权）
         List<Map<String, Object>> scatter = calculateScatter(comments);
-        int total = scatter.size() > 0 ? scatter.size() : 1;
+        int totalWeight = 0;
         int rt = 0, lt = 0, lb = 0, rb = 0;
         double sumX = 0, sumY = 0;
         for (Map<String, Object> pt : scatter) {
             double pol = Number(pt.get("polarity"));
             double inten = Number(pt.get("intensity"));
-            sumX += pol;
-            sumY += inten;
-            if (pol >= 0 && inten >= 2.5) rt++;
-            else if (pol < 0 && inten >= 2.5) lt++;
-            else if (pol < 0 && inten < 2.5) lb++;
-            else rb++;
+            int weight = ((Number) pt.getOrDefault("votes", 1)).intValue();
+            totalWeight += weight;
+            sumX += pol * weight;
+            sumY += inten * weight;
+            if (pol >= 0 && inten >= 2.5) rt += weight;
+            else if (pol < 0 && inten >= 2.5) lt += weight;
+            else if (pol < 0 && inten < 2.5) lb += weight;
+            else rb += weight;
         }
+        if (totalWeight == 0) totalWeight = 1;
 
         List<Map<String, Object>> quadrants = new ArrayList<>();
-        quadrants.add(buildQuadrant("狂热好评", "rightTop", rt, total, "高强度正面评价，观众对特定方面高度认可"));
-        quadrants.add(buildQuadrant("强烈差评", "leftTop", lt, total, "高强度负面评价，观众对特定方面强烈不满"));
-        quadrants.add(buildQuadrant("差强人意", "leftBottom", lb, total, "低强度负面评价，观众有保留意见但情绪不激烈"));
-        quadrants.add(buildQuadrant("比较推荐", "rightBottom", rb, total, "低到中强度正面评价，观众温和认可"));
+        quadrants.add(buildQuadrant("狂热好评", "rightTop", rt, totalWeight, "高强度正面评价，观众对特定方面高度认可"));
+        quadrants.add(buildQuadrant("强烈差评", "leftTop", lt, totalWeight, "高强度负面评价，观众对特定方面强烈不满"));
+        quadrants.add(buildQuadrant("差强人意", "leftBottom", lb, totalWeight, "低强度负面评价，观众有保留意见但情绪不激烈"));
+        quadrants.add(buildQuadrant("比较推荐", "rightBottom", rb, totalWeight, "低到中强度正面评价，观众温和认可"));
         emotionMap.put("quadrants", quadrants);
 
         Map<String, Object> centroid = new LinkedHashMap<>();
-        double cx = sumX / total;
-        double cy = sumY / total;
+        double cx = sumX / totalWeight;
+        double cy = sumY / totalWeight;
         centroid.put("x", Math.round(cx * 100) / 100.0);
         centroid.put("y", Math.round(cy * 100) / 100.0);
         String centroidLabel;
@@ -563,21 +624,22 @@ public class AnalysisService {
         centroid.put("label", centroidLabel);
         emotionMap.put("centroid", centroid);
 
-        // 主导方面
-        Map<String, Integer> aspectCount = new LinkedHashMap<>();
+        // 主导方面（加权统计）
+        Map<String, Integer> aspectWeight = new LinkedHashMap<>();
         for (Map<String, Object> pt : scatter) {
             String asp = String.valueOf(pt.get("aspect"));
-            aspectCount.merge(asp, 1, Integer::sum);
+            int w = ((Number) pt.getOrDefault("votes", 1)).intValue();
+            aspectWeight.merge(asp, w, Integer::sum);
         }
         String dominantAspect = "剧情";
         int maxCount = 0;
-        for (Map.Entry<String, Integer> e : aspectCount.entrySet()) {
+        for (Map.Entry<String, Integer> e : aspectWeight.entrySet()) {
             if (e.getValue() > maxCount) { maxCount = e.getValue(); dominantAspect = e.getKey(); }
         }
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("dominantAspect", dominantAspect);
-        summary.put("distributionSummary", String.format("讨论最多的是「%s」，狂热好评%d%%，强烈差评%d%%", dominantAspect, rt*100/total, lt*100/total));
+        summary.put("distributionSummary", String.format("讨论最多的是「%s」，狂热好评%d%%，强烈差评%d%%", dominantAspect, rt*100/totalWeight, lt*100/totalWeight));
         summary.put("interpretation", String.format("情绪重心(%.1f, %.1f)，%s", cx, cy, centroidLabel));
         emotionMap.put("summary", summary);
 
