@@ -268,10 +268,17 @@ public class ApiServlet extends HttpServlet {
                 List<Map<String, Object>> commentMaps = (List<Map<String, Object>>) requestBody.get("comments");
                 Map<String, Object> movieMap = (Map<String, Object>) requestBody.get("movie");
 
-                // AI 参数
-                String apiKey = JsonUtil.getStr(requestBody, "apiKey");
-                String aiModel = JsonUtil.getStr(requestBody, "model");
-                String aiPrompt = JsonUtil.getStr(requestBody, "prompt");
+                // AI 参数：从数据库读取（不依赖前端传值，避免掩码Key问题）
+                Map<String, Object> dbSettings = SettingService.getSettings();
+                Object apiKeyObj = dbSettings.get("apiKey");
+                String apiKey = apiKeyObj != null ? apiKeyObj.toString() : "";
+                if ("null".equals(apiKey)) apiKey = "";
+                Object modelObj = dbSettings.get("aiModel");
+                String aiModel = modelObj != null ? modelObj.toString() : "moonshot-v1-8k";
+                if ("null".equals(aiModel)) aiModel = "moonshot-v1-8k";
+                Object promptObj = dbSettings.get("aiPrompt");
+                String aiPrompt = promptObj != null ? promptObj.toString() : "";
+                if ("null".equals(aiPrompt) || aiPrompt.isEmpty()) aiPrompt = AiService.DEFAULT_PROMPT;
 
                 // 解析评论
                 List<Comment> allComments = new ArrayList<>();
