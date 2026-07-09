@@ -104,7 +104,8 @@ let appSettings = {
   apiBase: "/api",
   commentCount: 100,
   requestTimeout: 9,
-  aiModel: "moonshot-v1-8k",
+  aiModel: "deepseek-chat",
+  aiApiUrl: "https://api.deepseek.com/v1/chat/completions",
   apiKey: "",
   aiPrompt: DEFAULT_PROMPT,
   fallbackEnabled: true
@@ -121,7 +122,8 @@ async function loadSettingsFromApi() {
           apiBase: "/api",
           commentCount: s.commentCount || 100,
           requestTimeout: s.requestTimeout || 9,
-          aiModel: s.aiModel || "moonshot-v1-8k",
+          aiModel: s.aiModel || "deepseek-chat",
+          aiApiUrl: s.aiApiUrl || "https://api.deepseek.com/v1/chat/completions",
           apiKey: s.apiKey || "",
           aiPrompt: s.aiPrompt || DEFAULT_PROMPT,
           fallbackEnabled: s.fallbackEnabled !== false
@@ -138,6 +140,7 @@ function getSettings() {
 async function saveSettings() {
   const settings = {
     aiModel: $("#setting-model").value,
+    aiApiUrl: $("#setting-api-url").value,
     apiKey: $("#setting-api-key").value,
     aiPrompt: $("#setting-prompt").value,
     commentCount: parseInt($("#setting-comment-count").value) || 100,
@@ -176,6 +179,7 @@ function loadSettingsToForm() {
   $("#setting-comment-count").value = s.commentCount;
   $("#setting-timeout").value = s.requestTimeout;
   $("#setting-model").value = s.aiModel;
+  $("#setting-api-url").value = s.aiApiUrl || "https://api.deepseek.com/v1/chat/completions";
   $("#setting-api-key").value = s.apiKey;
   $("#setting-prompt").value = s.aiPrompt;
   $("#setting-fallback").checked = s.fallbackEnabled;

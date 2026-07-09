@@ -21,15 +21,16 @@ public class SettingService {
             if (rs.next()) {
                 settings.put("aiModel", rs.getString("ai_model"));
                 settings.put("apiKey", rs.getString("api_key"));
+                settings.put("aiApiUrl", rs.getString("ai_api_url"));
                 settings.put("aiPrompt", rs.getString("ai_prompt"));
                 settings.put("crawlerApiUrl", rs.getString("crawler_api_url"));
                 settings.put("commentCount", rs.getInt("comment_count"));
                 settings.put("requestTimeout", rs.getInt("request_timeout"));
                 settings.put("fallbackEnabled", rs.getBoolean("fallback_enabled"));
             } else {
-                // 如果表为空，返回默认值
-                settings.put("aiModel", "moonshot-v1-8k");
+                settings.put("aiModel", "deepseek-chat");
                 settings.put("apiKey", "");
+                settings.put("aiApiUrl", "https://api.deepseek.com/v1/chat/completions");
                 settings.put("aiPrompt", "");
                 settings.put("crawlerApiUrl", "https://m.douban.com/rexxar/api/v2");
                 settings.put("commentCount", 100);
@@ -38,8 +39,9 @@ public class SettingService {
             }
         } catch (SQLException e) {
             System.err.println("[SETTINGS] Load error: " + e.getMessage());
-            settings.put("aiModel", "moonshot-v1-8k");
+            settings.put("aiModel", "deepseek-chat");
             settings.put("apiKey", "");
+            settings.put("aiApiUrl", "https://api.deepseek.com/v1/chat/completions");
             settings.put("aiPrompt", "");
             settings.put("crawlerApiUrl", "https://m.douban.com/rexxar/api/v2");
             settings.put("commentCount", 100);
@@ -56,26 +58,27 @@ public class SettingService {
         Map<String, Object> result = new LinkedHashMap<>();
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE app_setting SET ai_model = ?, api_key = ?, ai_prompt = ?, " +
+                     "UPDATE app_setting SET ai_model = ?, api_key = ?, ai_api_url = ?, ai_prompt = ?, " +
                      "comment_count = ?, request_timeout = ?, fallback_enabled = ? WHERE id = 1")) {
-            ps.setString(1, String.valueOf(settings.getOrDefault("aiModel", "moonshot-v1-8k")));
+            ps.setString(1, String.valueOf(settings.getOrDefault("aiModel", "deepseek-chat")));
             ps.setString(2, String.valueOf(settings.getOrDefault("apiKey", "")));
-            ps.setString(3, String.valueOf(settings.getOrDefault("aiPrompt", "")));
-            ps.setInt(4, toInt(settings.get("commentCount"), 100));
-            ps.setInt(5, toInt(settings.get("requestTimeout"), 9));
-            ps.setBoolean(6, toBool(settings.get("fallbackEnabled"), true));
+            ps.setString(3, String.valueOf(settings.getOrDefault("aiApiUrl", "https://api.deepseek.com/v1/chat/completions")));
+            ps.setString(4, String.valueOf(settings.getOrDefault("aiPrompt", "")));
+            ps.setInt(5, toInt(settings.get("commentCount"), 100));
+            ps.setInt(6, toInt(settings.get("requestTimeout"), 9));
+            ps.setBoolean(7, toBool(settings.get("fallbackEnabled"), true));
             int rows = ps.executeUpdate();
             if (rows == 0) {
-                // 不存在则插入
                 try (PreparedStatement ins = conn.prepareStatement(
-                        "INSERT INTO app_setting (id, ai_model, api_key, ai_prompt, comment_count, request_timeout, fallback_enabled) " +
-                        "VALUES (1, ?, ?, ?, ?, ?, ?)")) {
-                    ins.setString(1, String.valueOf(settings.getOrDefault("aiModel", "moonshot-v1-8k")));
+                        "INSERT INTO app_setting (id, ai_model, api_key, ai_api_url, ai_prompt, comment_count, request_timeout, fallback_enabled) " +
+                        "VALUES (1, ?, ?, ?, ?, ?, ?, ?)")) {
+                    ins.setString(1, String.valueOf(settings.getOrDefault("aiModel", "deepseek-chat")));
                     ins.setString(2, String.valueOf(settings.getOrDefault("apiKey", "")));
-                    ins.setString(3, String.valueOf(settings.getOrDefault("aiPrompt", "")));
-                    ins.setInt(4, toInt(settings.get("commentCount"), 100));
-                    ins.setInt(5, toInt(settings.get("requestTimeout"), 9));
-                    ins.setBoolean(6, toBool(settings.get("fallbackEnabled"), true));
+                    ins.setString(3, String.valueOf(settings.getOrDefault("aiApiUrl", "https://api.deepseek.com/v1/chat/completions")));
+                    ins.setString(4, String.valueOf(settings.getOrDefault("aiPrompt", "")));
+                    ins.setInt(5, toInt(settings.get("commentCount"), 100));
+                    ins.setInt(6, toInt(settings.get("requestTimeout"), 9));
+                    ins.setBoolean(7, toBool(settings.get("fallbackEnabled"), true));
                     ins.executeUpdate();
                 }
             }

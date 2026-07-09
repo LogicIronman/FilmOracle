@@ -114,8 +114,9 @@ CREATE TABLE IF NOT EXISTS user_history (
 -- 系统设置表
 CREATE TABLE IF NOT EXISTS app_setting (
     id BIGINT PRIMARY KEY DEFAULT 1,
-    ai_model VARCHAR(100) DEFAULT 'moonshot-v1-8k',
+    ai_model VARCHAR(100) DEFAULT 'deepseek-chat',
     api_key VARCHAR(200),
+    ai_api_url VARCHAR(500) DEFAULT 'https://api.deepseek.com/v1/chat/completions',
     ai_prompt TEXT,
     crawler_api_url VARCHAR(500) DEFAULT 'https://m.douban.com/rexxar/api/v2',
     comment_count INT DEFAULT 100,
@@ -124,9 +125,9 @@ CREATE TABLE IF NOT EXISTS app_setting (
 );
 
 -- 初始化默认设置
-INSERT INTO app_setting (id, ai_model, crawler_api_url, comment_count, request_timeout, fallback_enabled)
-VALUES (1, 'moonshot-v1-8k', 'https://m.douban.com/rexxar/api/v2', 100, 9, TRUE)
-ON DUPLICATE KEY UPDATE ai_model = VALUES(ai_model), comment_count = VALUES(comment_count), request_timeout = VALUES(request_timeout);
+INSERT INTO app_setting (id, ai_model, ai_api_url, crawler_api_url, comment_count, request_timeout, fallback_enabled)
+VALUES (1, 'deepseek-chat', 'https://api.deepseek.com/v1/chat/completions', 'https://m.douban.com/rexxar/api/v2', 100, 9, TRUE)
+ON DUPLICATE KEY UPDATE ai_model = VALUES(ai_model), ai_api_url = VALUES(ai_api_url), comment_count = VALUES(comment_count), request_timeout = VALUES(request_timeout);
 
 -- 默认管理员账号 (密码: admin123, SHA-256)
 INSERT INTO user_account (username, password_hash, role)

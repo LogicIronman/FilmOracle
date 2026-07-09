@@ -274,11 +274,14 @@ public class ApiServlet extends HttpServlet {
                 String apiKey = apiKeyObj != null ? apiKeyObj.toString() : "";
                 if ("null".equals(apiKey)) apiKey = "";
                 Object modelObj = dbSettings.get("aiModel");
-                String aiModel = modelObj != null ? modelObj.toString() : "moonshot-v1-8k";
-                if ("null".equals(aiModel)) aiModel = "moonshot-v1-8k";
+                String aiModel = modelObj != null ? modelObj.toString() : "deepseek-chat";
+                if ("null".equals(aiModel)) aiModel = "deepseek-chat";
                 Object promptObj = dbSettings.get("aiPrompt");
                 String aiPrompt = promptObj != null ? promptObj.toString() : "";
                 if ("null".equals(aiPrompt) || aiPrompt.isEmpty()) aiPrompt = AiService.DEFAULT_PROMPT;
+                Object apiUrlObj = dbSettings.get("aiApiUrl");
+                String apiUrl = apiUrlObj != null ? apiUrlObj.toString() : "";
+                if ("null".equals(apiUrl)) apiUrl = "";
 
                 // 解析评论
                 List<Comment> allComments = new ArrayList<>();
@@ -322,7 +325,7 @@ public class ApiServlet extends HttpServlet {
                 // 如果有 API Key，尝试用 AI 分析
                 if (apiKey != null && !apiKey.isBlank() && !apiKey.startsWith("sk-***")) {
                     System.out.println("[ANALYZE] Using AI: model=" + aiModel + ", comments=" + valuableComments.size());
-                    analysis = AiService.analyzeWithAi(valuableComments, movie, apiKey, aiModel, aiPrompt);
+                    analysis = AiService.analyzeWithAi(valuableComments, movie, apiKey, aiModel, aiPrompt, apiUrl);
                     if (analysis != null) {
                         engine = "ai:" + aiModel;
                         System.out.println("[ANALYZE] AI analysis succeeded");

@@ -227,7 +227,8 @@
           <label>本地代理 API 地址<input id="setting-api-base" value="/api"></label>
           <label>单次获取评论数量<input id="setting-comment-count" type="number" value="100" min="20" max="500"></label>
           <label>请求超时<input id="setting-timeout" value="9s"></label>
-          <label>AI 模型<input id="setting-model" value="moonshot-v1-8k" placeholder="moonshot-v1-8k / moonshot-v1-32k"></label>
+          <label>AI 模型<input id="setting-model" value="deepseek-chat" placeholder="deepseek-chat / moonshot-v1-8k"></label>
+          <label class="span-2">AI API 地址<input id="setting-api-url" value="https://api.deepseek.com/v1/chat/completions" placeholder="https://api.deepseek.com/v1/chat/completions"></label>
           <label class="span-2">API Key<input id="setting-api-key" type="password" placeholder="sk-...（留空则使用本地规则引擎）"></label>
           <label class="span-2">AI 提示词<textarea id="setting-prompt" rows="8"></textarea></label>
           <label class="toggle-line"><input id="setting-fallback" type="checkbox" checked> 启用演示兜底数据</label>

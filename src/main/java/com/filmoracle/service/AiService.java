@@ -13,7 +13,7 @@ import java.util.*;
  */
 public class AiService {
 
-    private static final String MOONSHOT_URL = "https://api.moonshot.cn/v1/chat/completions";
+    private static final String DEFAULT_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
     /**
      * 默认 AI 提示词（详尽版）
@@ -100,7 +100,7 @@ public class AiService {
      * @return AnalysisResult 分析结果，失败返回 null
      */
     @SuppressWarnings("unchecked")
-    public static AnalysisResult analyzeWithAi(List<Comment> comments, Movie movie, String apiKey, String model, String customPrompt) {
+    public static AnalysisResult analyzeWithAi(List<Comment> comments, Movie movie, String apiKey, String model, String customPrompt, String apiUrl) {
         try {
             String prompt = (customPrompt != null && !customPrompt.isBlank()) ? customPrompt : DEFAULT_PROMPT;
 
@@ -134,8 +134,8 @@ public class AiService {
             Map<String, String> headers = new HashMap<>();
             headers.put("Authorization", "Bearer " + apiKey);
 
-            System.out.println("[AI] Calling Moonshot API: model=" + model + ", comments=" + comments.size());
-            String response = HttpUtil.post(MOONSHOT_URL, jsonBody, headers, 60);
+            System.out.println("[AI] Calling AI API: url=" + (apiUrl != null && !apiUrl.isBlank() ? apiUrl : DEFAULT_API_URL) + ", model=" + model + ", comments=" + comments.size());
+            String response = HttpUtil.post(apiUrl != null && !apiUrl.isBlank() ? apiUrl : DEFAULT_API_URL, jsonBody, headers, 60);
             System.out.println("[AI] Response received, parsing...");
 
             // 解析响应
