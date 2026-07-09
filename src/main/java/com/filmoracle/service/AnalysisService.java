@@ -65,7 +65,19 @@ public class AnalysisService {
             "这是", "那是", "还有", "如果", "虽然", "不过", "其实", "这样", "那样",
             "不得", "不到", "不会", "不能", "不要", "不用", "不行", "无关",
             "很多", "很少", "特别", "确实", "相对", "一般", "普通",
-            "好看", "不好", "不错", "还行", "太差", "太好", "说是", "来说", "对于"
+            "好看", "不好", "不错", "还行", "太差", "太好", "说是", "来说", "对于",
+            "这么", "看的", "的是", "这是", "有的", "一样", "的话", "似的", "有些", "也是",
+            "都是", "不算", "而是", "本来", "原来", "其实", "出来", "起来", "下去", "过来",
+            "看过", "看着", "看了一", "看了两", "看了三", "看完这", "看完那",
+            "只能说", "不知道", "不觉得", "不至于", "不至于", "不至于",
+            "那个", "那个", "这个", "那些", "这些", "此片", "该片", "此剧", "本片",
+            "完全不", "并不", "并非", "并非是", "并不是", "不算太", "不算很",
+            "我觉得", "我感觉", "我认为", "我想说", "说实话", "讲真", "客观说",
+            "个人觉", "总体来", "整体来", "综合来", "总结来", "一句话",
+            "演技在", "画面在", "剧情在", "节奏在", "配乐在", "主题在",
+            "第一遍", "第二次", "第一次", "一开始", "第一眼",
+            "整个电", "整个故", "整部片", "整部电",
+            "且不", "而且不", "但也不", "可是不", "却不", "却没"
     ));
 
     /**
@@ -168,6 +180,9 @@ public class AnalysisService {
 
         // 5. 情感散点
         result.setScatter(calculateScatter(comments));
+
+        // 5b. 情绪分布图
+        result.setEmotionMap(calculateEmotionMap(comments));
 
         // 6. 十维雷达
         result.setRadar(calculateRadar(comments, movie));
@@ -422,21 +437,137 @@ public class AnalysisService {
         return comp;
     }
 
-    // ─── 情感散点 ───
+    // ─── 情绪标签分类 ───
+    private static final Pattern EMOTION_REPRESSIVE = Pattern.compile("压抑|惊悚|恐怖|窒息|黑暗|绝望|崩溃|沉重|不安|恐惧|吓|毛骨悚然");
+    private static final Pattern EMOTION_BURNING = Pattern.compile("燃|热血|激动|震撼|爽|炸裂|高能|沸腾|刺激|兴奋|过瘾");
+    private static final Pattern EMOTION_LONELY = Pattern.compile("孤独|克制|冷静|疏离|沉默|内敛|沉郁|寂寥|遗憾|可惜|无奈");
+    private static final Pattern EMOTION_HEALING = Pattern.compile("治愈|轻松|温暖|舒服|可爱|温馨|柔软|明朗|甜蜜|感动|泪目|破防");
+    private static final Pattern EMOTION_NEGATIVE_EXTRA = Pattern.compile("过誉|名不副实|失望|无聊|拖沓|尴尬|刻意|做作|生硬|烂|差|踩雷");
+
+    private static String classifyEmotionLabel(String text, int rating) {
+        if (EMOTION_REPRESSIVE.matcher(text).find()) return "压抑";
+        if (EMOTION_BURNING.matcher(text).find()) return "热血";
+        if (EMOTION_HEALING.matcher(text).find()) return rating >= 4 ? "感动" : "治愈";
+        if (EMOTION_LONELY.matcher(text).find()) return "孤独";
+        if (EMOTION_NEGATIVE_EXTRA.matcher(text).find()) return rating <= 2 ? "过誉" : "遗憾";
+        if (rating >= 4) return "感动";
+        if (rating <= 2) return "压抑";
+        return "克制";
+    }
+
+    private static String getCommentQuote(String text) {
+        if (text == null || text.isEmpty()) return "";
+        String t = text.trim();
+        return t.length() <= 30 ? t : t.substring(0, 30) + "...";
+    }
+
+    // ─── 情感散点（增强版：含情绪标签、权重、引用、抖动）───
     private static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
         List<Map<String, Object>> scatter = new ArrayList<>();
+        java.util.Random jitter = new java.util.Random(42);
         for (int i = 0; i < comments.size(); i++) {
             Comment c = comments.get(i);
             double[] xy = calculateXY(c);
+            // 轻微抖动避免堆叠
+            double jx = (jitter.nextDouble() - 0.5) * 0.06;
+            double jy = (jitter.nextDouble() - 0.5) * 0.04;
+            double x = Math.max(-1, Math.min(1, xy[0] + jx));
+            double y = Math.max(0, Math.min(1, xy[1] + jy));
+            String quadrant = c.getQuadrant();
+            String emotionLabel = classifyEmotionLabel(c.getText(), c.getRatingValue());
+            double weight = 4 + Math.min(8, c.getVoteCount() / 10.0) + xy[1] * 4;
+
             Map<String, Object> point = new LinkedHashMap<>();
-            point.put("x", Math.round(xy[0] * 100) / 100.0);
-            point.put("y", Math.round(xy[1] * 100) / 100.0);
+            point.put("x", Math.round(x * 100) / 100.0);
+            point.put("y", Math.round(y * 100) / 100.0);
             point.put("sentiment", c.getSentiment());
-            point.put("label", c.getQuadrant());
+            point.put("emotionLabel", emotionLabel);
+            point.put("quadrant", quadrant);
+            point.put("weight", Math.round(weight * 10) / 10.0);
+            point.put("quote", getCommentQuote(c.getText()));
             point.put("index", i);
             scatter.add(point);
         }
         return scatter;
+    }
+
+    // ─── 情绪分布图（完整结构）───
+    private static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
+        Map<String, Object> emotionMap = new LinkedHashMap<>();
+        // 坐标轴说明
+        Map<String, String> axis = new LinkedHashMap<>();
+        axis.put("x", "消极 ← 情绪倾向 → 积极");
+        axis.put("y", "平静 → 情绪强度 → 强烈");
+        emotionMap.put("axis", axis);
+
+        int total = comments.size() > 0 ? comments.size() : 1;
+        // 四象限统计
+        int lt = 0, rt = 0, lb = 0, rb = 0; // leftTop, rightTop, leftBottom, rightBottom
+        double sumX = 0, sumY = 0;
+        Map<String, Integer> emotionCount = new LinkedHashMap<>();
+
+        for (Comment c : comments) {
+            double[] xy = calculateXY(c);
+            sumX += xy[0];
+            sumY += xy[1];
+            String el = classifyEmotionLabel(c.getText(), c.getRatingValue());
+            emotionCount.merge(el, 1, Integer::sum);
+            if (xy[0] < 0 && xy[1] >= 0.5) lt++;
+            else if (xy[0] >= 0 && xy[1] >= 0.5) rt++;
+            else if (xy[0] < 0 && xy[1] < 0.5) lb++;
+            else rb++;
+        }
+
+        List<Map<String, Object>> quadrants = new ArrayList<>();
+        quadrants.add(buildQuadrant("压抑/惊悚", "leftTop", lt, total, "该象限代表高强度负面情绪，例如恐惧、压抑、窒息、不安"));
+        quadrants.add(buildQuadrant("热血/高燃", "rightTop", rt, total, "该象限代表高强度正面情绪，例如震撼、兴奋、爽感、热血"));
+        quadrants.add(buildQuadrant("孤独/克制", "leftBottom", lb, total, "该象限代表低强度负面或内敛情绪，例如遗憾、孤独、冷感、克制"));
+        quadrants.add(buildQuadrant("治愈/轻松", "rightBottom", rb, total, "该象限代表低到中强度正面情绪，例如温暖、治愈、轻松、回甘"));
+        emotionMap.put("quadrants", quadrants);
+
+        // 情绪重心
+        Map<String, Object> centroid = new LinkedHashMap<>();
+        double cx = sumX / total;
+        double cy = sumY / total;
+        centroid.put("x", Math.round(cx * 100) / 100.0);
+        centroid.put("y", Math.round(cy * 100) / 100.0);
+        String centroidLabel;
+        if (cx >= 0 && cy >= 0.5) centroidLabel = "整体情绪偏正面且强烈，观众反应热烈";
+        else if (cx >= 0 && cy < 0.5) centroidLabel = "整体情绪偏正面但温和，观众认可度平稳";
+        else if (cx < 0 && cy >= 0.5) centroidLabel = "整体情绪偏负面且强烈，争议较大";
+        else centroidLabel = "整体情绪偏负面且克制，观众存在保留意见";
+        centroid.put("label", centroidLabel);
+        emotionMap.put("centroid", centroid);
+
+        // 主导情绪
+        String dominantEmotion = "中性";
+        int maxCount = 0;
+        for (Map.Entry<String, Integer> e : emotionCount.entrySet()) {
+            if (e.getValue() > maxCount) { maxCount = e.getValue(); dominantEmotion = e.getKey(); }
+        }
+
+        // 摘要
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("dominantEmotion", dominantEmotion);
+        long posCount = comments.stream().filter(c -> "正面".equals(c.getSentiment())).count();
+        long negCount = comments.stream().filter(c -> "负面".equals(c.getSentiment())).count();
+        int posPercent = (int)(posCount * 100 / total);
+        int negPercent = (int)(negCount * 100 / total);
+        summary.put("distributionSummary", String.format("正面%d%%、负面%d%%，主导情绪为「%s」", posPercent, negPercent, dominantEmotion));
+        summary.put("interpretation", String.format("观众情绪重心位于(%+.2f, %.2f)，%s", cx, cy, centroidLabel));
+        emotionMap.put("summary", summary);
+
+        return emotionMap;
+    }
+
+    private static Map<String, Object> buildQuadrant(String name, String position, int count, int total, String desc) {
+        Map<String, Object> q = new LinkedHashMap<>();
+        q.put("name", name);
+        q.put("position", position);
+        q.put("count", count);
+        q.put("percent", Math.round(count * 100.0 / total));
+        q.put("description", desc);
+        return q;
     }
 
     // ─── 十维雷达图 ───

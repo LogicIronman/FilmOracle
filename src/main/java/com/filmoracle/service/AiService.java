@@ -22,25 +22,30 @@ public class AiService {
         你是一位专业的电影评论分析师。请分析以下电影评论数据，输出纯JSON格式的分析结果（不要markdown，不要```json标记）。
 
         分析要求：
-        1. 优点提炼：从评论中找出观众反复提及的亮点。不要泛泛说"演技好、画面美"，要具体到哪个场景、哪个细节被称赞，引用评论者的原话或观点。例如"多位观众提到雨夜逃亡段落的镜头调度"，而非"摄影出色"。
-        2. 缺点与争议：诚实指出评论中暴露的问题。哪些情节被质疑逻辑不通？哪些角色被批评单薄？哪些手法被认为刻意？如果评论间存在分歧（同一元素有人赞有人弹），要呈现这种张力，不要回避。
-        3. 过人之处：将本片与同类型、同题材或同导演的其他作品横向比较。评论者自己是否提到了参照系？如果没有，你根据评论反映的特征主动比较。比较要落到具体手法上，不要空泛地说"更深刻"。
-        4. 观众情绪图谱：评论者看完电影后的情绪状态是什么，是被震撼、被治愈、被冒犯，还是觉得过誉了？这种情绪集中体现在哪些评论里？
-        5. 总评：约400字综合评析。先说这部电影在评论中呈现的核心面貌，再分述优缺点，优缺点比例按评论实际反映的比例来，最后给出有判断力的结论，说明适合什么样的观众以及独特价值。不要说"值得一看"这种废话。
-        6. 关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"这类过于通用的词，除非评论反复围绕具体搭配出现。
-        7. 十维雷达图必须拉开差距。不要所有维度都集中在8分附近，评论明显批评的维度应低到4-6分，明显突出的维度可到8.5-9.6分。
-        8. 情感散点必须基于每条评论文本和星级判断精确坐标：x为-1到1，y为0到1，强烈愤怒/震撼/狂喜/压抑应给更高y值。
+        1. 优点提炼：从评论中找出观众反复提及的亮点。不要泛泛说"演技好、画面美"，要具体到哪个场景、哪个细节被称赞，引用评论者的原话或观点。
+        2. 缺点与争议：诚实指出评论中暴露的问题。如果评论间存在分歧，要呈现这种张力。
+        3. 横向比较：将本片与同类型、同题材作品比较，落到具体手法上。
+        4. 总评：约400字综合评析，包含优缺点、横向比较、结论。
+        5. 关键词必须来自评论中的经典总结词语或高频短语，避免"剧情、演技、画面"等通用词。
+        6. 十维雷达图必须拉开差距，批评维度低到4-6分，突出维度可到8.5-9.6分。
+        7. scatter中每条评论需要判断x(-1到1, 情绪倾向)、y(0到1, 情绪强度)、sentiment、emotionLabel(具体情绪如压抑/热血/感动/遗憾/治愈/孤独/过誉)、quadrant、weight(1-10)、quote(评论摘要前30字)。
+        8. emotionMap需包含四象限统计(含count和percent)、情绪重心centroid(x,y,label)、summary(dominantEmotion, distributionSummary, interpretation)。
 
         输出JSON格式（纯JSON，不要markdown标记）：
         {
-          "keywords": [["关键词", 出现次数], ...],
+          "keywords": [["关键词", 次数], ...],
           "ratingDistribution": [["5星", 百分比], ["4星", 百分比], ["3星", 百分比], ["2星", 百分比], ["1星", 百分比]],
           "comparison": [["本片评分", 值], ["同类型热度", 值], ["评价人数", 值], ["正向情绪", 值]],
           "radar": [["剧本", 分数], ["导演", 分数], ["表演", 分数], ["摄影", 分数], ["剪辑", 分数], ["声音", 分数], ["美术", 分数], ["特效", 分数], ["主题", 分数], ["完成度", 分数]],
-          "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "情感", "label": "象限", "index": 序号}, ...],
+          "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "情绪标签", "quadrant": "象限", "weight": 权重, "quote": "评论摘要", "index": 序号}, ...],
+          "emotionMap": {
+            "quadrants": [{"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "描述"}, ...],
+            "centroid": {"x": 值, "y": 值, "label": "重心说明"},
+            "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "分布总结", "interpretation": "解读"}
+          },
           "sentimentDistribution": {"positive": 百分比, "negative": 百分比, "neutral": 百分比},
           "summary": {"positiveRate": 值, "negativeRate": 值, "neutralRate": 值, "keywordsSummary": "关键词摘要", "mainControversy": "争议点", "totalComments": 数量},
-          "review": "400字综合评析，包含优点、缺点、横向比较、总评，每句结论有评论依据"
+          "review": "400字综合评析"
         }
         """;
 
@@ -131,6 +136,12 @@ public class AiService {
 
             // scatter
             result.setScatter(extractScatterList(aiResult));
+
+            // emotionMap (if AI returns it)
+            Map<String, Object> emotionMap = (Map<String, Object>) aiResult.get("emotionMap");
+            if (emotionMap != null) {
+                result.setEmotionMap(emotionMap);
+            }
 
             // sentimentDistribution
             Map<String, Object> sd = (Map<String, Object>) aiResult.get("sentimentDistribution");

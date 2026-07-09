@@ -10,7 +10,8 @@ public class AnalysisResult {
     private List<Object[]> keywords;           // [[word, count], ...]
     private List<Object[]> ratingDistribution; // [[label, percent], ...]
     private List<Object[]> comparison;         // [[label, value], ...]
-    private List<Map<String, Object>> scatter; // [{x, y, sentiment, label, index}, ...]
+    private List<Map<String, Object>> scatter; // [{x, y, sentiment, emotionLabel, quadrant, weight, quote, index}, ...]
+    private Map<String, Object> emotionMap;   // {quadrants, centroid, summary, axis}
     private List<Object[]> radar;              // [[label, score], ...]
     private Map<String, Integer> sentimentDistribution; // {positive, negative, neutral}
     private Map<String, Object> summary;       // {positiveRate, negativeRate, neutralRate, keywordsSummary, mainControversy}
@@ -27,6 +28,8 @@ public class AnalysisResult {
     public void setComparison(List<Object[]> comparison) { this.comparison = comparison; }
     public List<Map<String, Object>> getScatter() { return scatter; }
     public void setScatter(List<Map<String, Object>> scatter) { this.scatter = scatter; }
+    public Map<String, Object> getEmotionMap() { return emotionMap; }
+    public void setEmotionMap(Map<String, Object> emotionMap) { this.emotionMap = emotionMap; }
     public List<Object[]> getRadar() { return radar; }
     public void setRadar(List<Object[]> radar) { this.radar = radar; }
     public Map<String, Integer> getSentimentDistribution() { return sentimentDistribution; }

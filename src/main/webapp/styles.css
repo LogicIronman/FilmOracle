@@ -1146,6 +1146,75 @@ textarea {
   animation: fadeInUp 0.3s ease both;
 }
 
+/* ===== Toast Notification ===== */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  z-index: 200;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  background: var(--dark);
+  color: #fffaf4;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(20, 20, 19, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Larger search input text */
+.search-command input {
+  font-size: 17px;
+}
+.detail-search-command input {
+  font-size: 16px;
+}
+
+/* Emotion map styles */
+.emotion-map {
+  position: relative;
+  width: 100%;
+}
+.emotion-map svg {
+  width: 100%;
+  height: auto;
+}
+.emotion-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #e8d5cc;
+}
+.emotion-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.emotion-legend .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.emotion-summary {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  color: #e8d5cc;
+  line-height: 1.5;
+}
+
 @media (max-width: 920px) {
   .topbar,
   .workspace-head,

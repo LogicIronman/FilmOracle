@@ -56,8 +56,6 @@
         <div class="workspace-head">
           <div>
             <button class="text-action" type="button" data-view="home">返回主页</button>
-            <p class="eyebrow">搜索结果</p>
-            <h2 id="results-title">搜索结果</h2>
           </div>
           <button class="secondary-action" type="button" data-view="settings">设置</button>
         </div>
@@ -93,7 +91,7 @@
           <button class="primary-action dark" type="button" id="fetch-analyze">获取并 AI 分析</button>
           <button class="secondary-action" type="button" data-view="import">导入评论</button>
           <button class="secondary-action" type="button" id="export-comments">导出评论</button>
-          <button class="secondary-action" type="button" id="save-history">保存到历史</button>
+          <button class="secondary-action" type="button" id="export-pdf">导出报告</button>
         </section>
 
         <section class="terminal-panel" aria-label="任务进度">
@@ -113,7 +111,7 @@
           </article>
           <article class="analysis-panel dark-panel">
             <div class="panel-head">
-              <h3>情感散点图</h3>
+              <h3>观众情绪分布图</h3>
             </div>
             <div id="scatter-chart"></div>
           </article>
@@ -181,16 +179,16 @@
           <section class="source-form">
             <h3>来源电影信息</h3>
             <div class="form-grid">
-              <label>电影名称<input name="title" value="星际穿越"></label>
-              <label>年份<input name="year" value="2014"></label>
-              <label>导演<input name="director" value="克里斯托弗·诺兰"></label>
-              <label>主演<input name="cast" value="马修·麦康纳 / 安妮·海瑟薇"></label>
-              <label>类型<input name="genre" value="科幻 / 冒险 / 剧情"></label>
-              <label>国家/地区<input name="region" value="美国 / 英国"></label>
-              <label>语言<input name="language" value="英语"></label>
-              <label>片长<input name="duration" value="169分钟"></label>
-              <label class="span-2">来源链接<input name="source" value="https://movie.douban.com/subject/demo"></label>
-              <label class="span-2">简介<textarea name="summary">一组探险家穿越虫洞，为人类寻找新的家园。</textarea></label>
+              <label>电影名称（必填）<input name="title" required placeholder="输入电影名称"></label>
+              <label>年份<input name="year" placeholder="如 2014"></label>
+              <label>导演<input name="director" placeholder="如 克里斯托弗·诺兰"></label>
+              <label>主演<input name="cast" placeholder="如 马修·麦康纳"></label>
+              <label>类型<input name="genre" placeholder="如 科幻 / 剧情"></label>
+              <label>国家/地区<input name="region" placeholder="如 美国"></label>
+              <label>语言<input name="language" placeholder="如 英语"></label>
+              <label>片长<input name="duration" placeholder="如 169分钟"></label>
+              <label class="span-2">来源链接<input name="source" placeholder="https://"></label>
+              <label class="span-2">简介<textarea name="summary" placeholder="电影简介（选填）"></textarea></label>
             </div>
           </section>
           <section class="upload-panel">
@@ -261,6 +259,8 @@
       </form>
     </div>
   </div>
+
+  <div class="toast" id="toast"></div>
 
   <script src="./app.js"></script>
 </body>
