@@ -51,11 +51,20 @@ public class AiService {
         6. 十维雷达图：
         十维雷达图必须拉开差距，批评维度低到 4-6 分，突出维度可到 8.5-9.6 分。十维包括：剧本、导演、表演、摄影、剪辑、声音、美术、特效、主题、完成度。
 
-        7. 情绪散点 scatter：
-        每条评论需要判断 x(-1到1,情绪倾向)、y(0到1,情绪强度)、sentiment、emotionLabel(具体情绪)、quadrant、weight(1-10)、quote(评论摘要前30字)、index。
+        7. scatter（方面级情感分析）：
+        对评论做方面级情感分析，每条评论可拆成多条记录（每条对应一个方面）。
+        - aspect：枚举值 剧情|演技|视听|节奏|主题|配乐|美术|结尾
+        - polarity：-5.0到5.0，负值=差评，正值=好评
+        - intensity：0.0到5.0，0=平淡，5=强烈情绪
+        - votes：点赞数（没有填0）
+        - text：评论原文摘录，最多60字
+        一条评论涉及多个方面就拆分。至少输出8条。反讽按真实情感打分。
 
-        8. 观众情绪分布图 emotionMap：
-        基于 scatter 统计四象限分布，包含 quadrants(每个含name,position,count,percent,description)、centroid(x,y,label)、summary(dominantEmotion,distributionSummary,interpretation)。
+        8. emotionMap：基于scatter统计四象限。
+        - quadrants：每个含name/position/count/percent/description
+        - centroid：x(polarity均值)/y(intensity均值)/label
+        - summary：dominantAspect/distributionSummary/interpretation
+        四象限：rightTop=狂热好评, leftTop=强烈差评, leftBottom=差强人意, rightBottom=比较推荐
 
         9. 情感分布：positive、negative、neutral 百分比总和必须为 100。
         10. 星级分布：5星到1星占比总和必须为 100。
@@ -67,16 +76,16 @@ public class AiService {
           "ratingDistribution": [["5星", 百分比], ["4星", 百分比], ["3星", 百分比], ["2星", 百分比], ["1星", 百分比]],
           "comparison": [["本片评分", 值], ["同类型热度", 值], ["评价人数", 值], ["正向情绪", 值]],
           "radar": [["剧本", 分数], ["导演", 分数], ["表演", 分数], ["摄影", 分数], ["剪辑", 分数], ["声音", 分数], ["美术", 分数], ["特效", 分数], ["主题", 分数], ["完成度", 分数]],
-          "scatter": [{"x": 坐标, "y": 坐标, "sentiment": "正面/负面/中性", "emotionLabel": "情绪标签", "quadrant": "象限", "weight": 权重, "quote": "评论摘要", "index": 序号}],
+          "scatter": [{"aspect": "方面", "polarity": -5.0到5.0, "intensity": 0.0到5.0, "votes": 点赞数, "text": "评论摘录"}],
           "emotionMap": {
             "quadrants": [
-              {"name": "压抑/惊悚", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "高强度负面情绪"},
-              {"name": "热血/高燃", "position": "rightTop", "count": 数量, "percent": 百分比, "description": "高强度正面情绪"},
-              {"name": "孤独/克制", "position": "leftBottom", "count": 数量, "percent": 百分比, "description": "低强度负面或内敛情绪"},
-              {"name": "治愈/轻松", "position": "rightBottom", "count": 数量, "percent": 百分比, "description": "低到中强度正面情绪"}
+              {"name": "狂热好评", "position": "rightTop", "count": 数量, "percent": 百分比, "description": "高强度正面"},
+              {"name": "强烈差评", "position": "leftTop", "count": 数量, "percent": 百分比, "description": "高强度负面"},
+              {"name": "差强人意", "position": "leftBottom", "count": 数量, "percent": 百分比, "description": "低强度负面"},
+              {"name": "比较推荐", "position": "rightBottom", "count": 数量, "percent": 百分比, "description": "低强度正面"}
             ],
-            "centroid": {"x": 值, "y": 值, "label": "情绪重心说明"},
-            "summary": {"dominantEmotion": "主导情绪", "distributionSummary": "分布总结", "interpretation": "观影体验解读"}
+            "centroid": {"x": 值, "y": 值, "label": "重心说明"},
+            "summary": {"dominantAspect": "主导方面", "distributionSummary": "分布总结", "interpretation": "解读"}
           },
           "sentimentDistribution": {"positive": 百分比, "negative": 百分比, "neutral": 百分比},
           "summary": {"positiveRate": 值, "negativeRate": 值, "neutralRate": 值, "keywordsSummary": "关键词摘要", "mainControversy": "争议点", "totalComments": 数量},

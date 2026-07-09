@@ -366,7 +366,7 @@ public class AnalysisService {
 
         List<Object[]> keywords = new ArrayList<>();
         for (Map.Entry<String, Double> entry : ranked) {
-            if (keywords.size() >= 18) break;
+            if (keywords.size() >= 30) break;
             String word = entry.getKey();
             boolean duplicate = false;
             for (Object[] item : keywords) {
@@ -437,127 +437,156 @@ public class AnalysisService {
         return comp;
     }
 
-    // ─── 情绪标签分类 ───
-    private static final Pattern EMOTION_REPRESSIVE = Pattern.compile("压抑|惊悚|恐怖|窒息|黑暗|绝望|崩溃|沉重|不安|恐惧|吓|毛骨悚然");
-    private static final Pattern EMOTION_BURNING = Pattern.compile("燃|热血|激动|震撼|爽|炸裂|高能|沸腾|刺激|兴奋|过瘾");
-    private static final Pattern EMOTION_LONELY = Pattern.compile("孤独|克制|冷静|疏离|沉默|内敛|沉郁|寂寥|遗憾|可惜|无奈");
-    private static final Pattern EMOTION_HEALING = Pattern.compile("治愈|轻松|温暖|舒服|可爱|温馨|柔软|明朗|甜蜜|感动|泪目|破防");
-    private static final Pattern EMOTION_NEGATIVE_EXTRA = Pattern.compile("过誉|名不副实|失望|无聊|拖沓|尴尬|刻意|做作|生硬|烂|差|踩雷");
+    // ─── 方面级情感分析 ───
+    private static final String[][] ASPECT_PATTERNS = {
+        {"剧情", "故事|情节|叙事|剧本|线索|伏笔|反转|逻辑|设定|桥段|套路"},
+        {"演技", "演技|表演|演员|角色|饰演|演绎|主角|配角|群像"},
+        {"视听", "画面|镜头|摄影|视效|特效|色彩|构图|光影|视觉|画面"},
+        {"节奏", "节奏|拖沓|紧凑|缓慢|快|慢|剪辑|转折|推进|松散"},
+        {"主题", "主题|思想|深度|内涵|隐喻|象征|哲学|意义|表达|探讨"},
+        {"配乐", "配乐|音乐|音效|BGM|主题曲|背景音|原声|配乐"},
+        {"美术", "美术|布景|服装|道具|场景|美术设计|造型|服化道"},
+        {"结尾", "结尾|结局|最后|收尾|尾声|终章|结局"}
+    };
+    private static final Pattern STRONG_POSITIVE = Pattern.compile("封神|绝了|震撼|神作|标杆|教科书|天花板|无可挑剔|完美|杰作");
+    private static final Pattern STRONG_NEGATIVE = Pattern.compile("崩坏|败笔|烂尾|灾难|一塌糊涂|惨不忍睹|狗屁|垃圾|烂片|圾");
+    private static final Pattern MODERATE_POSITIVE = Pattern.compile("好看|出色|精彩|到位|扎实|细腻|惊艳|亮眼|加分");
+    private static final Pattern MODERATE_NEGATIVE = Pattern.compile("不行|不足|欠缺|薄弱|生硬|尴尬|刻意|拖沓|无聊|失望|减分");
 
-    private static String classifyEmotionLabel(String text, int rating) {
-        if (EMOTION_REPRESSIVE.matcher(text).find()) return "压抑";
-        if (EMOTION_BURNING.matcher(text).find()) return "热血";
-        if (EMOTION_HEALING.matcher(text).find()) return rating >= 4 ? "感动" : "治愈";
-        if (EMOTION_LONELY.matcher(text).find()) return "孤独";
-        if (EMOTION_NEGATIVE_EXTRA.matcher(text).find()) return rating <= 2 ? "过誉" : "遗憾";
-        if (rating >= 4) return "感动";
-        if (rating <= 2) return "压抑";
-        return "克制";
+    private static double calculateAspectPolarity(Comment c, String aspect) {
+        String text = c.getText();
+        int rating = c.getRatingValue();
+        double base = (rating - 3) * 1.2;
+        if (STRONG_POSITIVE.matcher(text).find()) base += 2.0;
+        if (STRONG_NEGATIVE.matcher(text).find()) base -= 2.0;
+        if (MODERATE_POSITIVE.matcher(text).find()) base += 0.8;
+        if (MODERATE_NEGATIVE.matcher(text).find()) base -= 0.8;
+        return Math.max(-5.0, Math.min(5.0, Math.round(base * 10) / 10.0));
     }
 
-    private static String getCommentQuote(String text) {
+    private static double calculateAspectIntensity(Comment c) {
+        String text = c.getText();
+        int count = 0;
+        if (STRONG_POSITIVE.matcher(text).find()) count += 2;
+        if (STRONG_NEGATIVE.matcher(text).find()) count += 2;
+        count += countMatches(text, "震撼|封神|绝|崩|烂|败|哭|泪|破防|窒息|压抑|愤怒|爽|燃");
+        double intensity = 1.0 + count * 0.6;
+        return Math.max(0.5, Math.min(5.0, Math.round(intensity * 10) / 10.0));
+    }
+
+    private static String getCommentExcerpt(String text, int maxLen) {
         if (text == null || text.isEmpty()) return "";
         String t = text.trim();
-        return t.length() <= 30 ? t : t.substring(0, 30) + "...";
+        return t.length() <= maxLen ? t : t.substring(0, maxLen) + "...";
     }
 
-    // ─── 情感散点（增强版：含情绪标签、权重、引用、抖动）───
+    // ─── 方面级散点（每条评论按提及方面拆分）───
     private static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
         List<Map<String, Object>> scatter = new ArrayList<>();
         java.util.Random jitter = new java.util.Random(42);
-        for (int i = 0; i < comments.size(); i++) {
-            Comment c = comments.get(i);
-            double[] xy = calculateXY(c);
-            // 轻微抖动避免堆叠
-            double jx = (jitter.nextDouble() - 0.5) * 0.06;
-            double jy = (jitter.nextDouble() - 0.5) * 0.04;
-            double x = Math.max(-1, Math.min(1, xy[0] + jx));
-            double y = Math.max(0, Math.min(1, xy[1] + jy));
-            String quadrant = c.getQuadrant();
-            String emotionLabel = classifyEmotionLabel(c.getText(), c.getRatingValue());
-            double weight = 4 + Math.min(8, c.getVoteCount() / 10.0) + xy[1] * 4;
-
-            Map<String, Object> point = new LinkedHashMap<>();
-            point.put("x", Math.round(x * 100) / 100.0);
-            point.put("y", Math.round(y * 100) / 100.0);
-            point.put("sentiment", c.getSentiment());
-            point.put("emotionLabel", emotionLabel);
-            point.put("quadrant", quadrant);
-            point.put("weight", Math.round(weight * 10) / 10.0);
-            point.put("quote", getCommentQuote(c.getText()));
-            point.put("index", i);
-            scatter.add(point);
+        for (Comment c : comments) {
+            String text = c.getText();
+            for (String[] aspectRule : ASPECT_PATTERNS) {
+                String aspect = aspectRule[0];
+                Pattern p = Pattern.compile(aspectRule[1]);
+                if (!p.matcher(text).find()) continue;
+                double polarity = calculateAspectPolarity(c, aspect);
+                double intensity = calculateAspectIntensity(c);
+                double jx = (jitter.nextDouble() - 0.5) * 0.3;
+                double jy = (jitter.nextDouble() - 0.5) * 0.2;
+                polarity = Math.max(-5.0, Math.min(5.0, polarity + jx));
+                intensity = Math.max(0.0, Math.min(5.0, intensity + jy));
+                Map<String, Object> point = new LinkedHashMap<>();
+                point.put("aspect", aspect);
+                point.put("polarity", Math.round(polarity * 10) / 10.0);
+                point.put("intensity", Math.round(intensity * 10) / 10.0);
+                point.put("votes", c.getVoteCount());
+                point.put("text", getCommentExcerpt(text, 60));
+                scatter.add(point);
+            }
+            if (scatter.isEmpty()) {
+                double polarity = calculateAspectPolarity(c, "剧情");
+                double intensity = calculateAspectIntensity(c);
+                Map<String, Object> point = new LinkedHashMap<>();
+                point.put("aspect", "剧情");
+                point.put("polarity", Math.round(polarity * 10) / 10.0);
+                point.put("intensity", Math.round(intensity * 10) / 10.0);
+                point.put("votes", c.getVoteCount());
+                point.put("text", getCommentExcerpt(text, 60));
+                scatter.add(point);
+            }
         }
         return scatter;
     }
 
-    // ─── 情绪分布图（完整结构）───
+    // ─── 情绪分布图（新四象限）───
     private static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
         Map<String, Object> emotionMap = new LinkedHashMap<>();
-        // 坐标轴说明
         Map<String, String> axis = new LinkedHashMap<>();
-        axis.put("x", "消极 ← 情绪倾向 → 积极");
-        axis.put("y", "平静 → 情绪强度 → 强烈");
+        axis.put("x", "差评 ← polarity → 好评");
+        axis.put("y", "平淡 → intensity → 强烈");
         emotionMap.put("axis", axis);
 
-        int total = comments.size() > 0 ? comments.size() : 1;
-        // 四象限统计
-        int lt = 0, rt = 0, lb = 0, rb = 0; // leftTop, rightTop, leftBottom, rightBottom
+        // 用散点数据统计象限
+        List<Map<String, Object>> scatter = calculateScatter(comments);
+        int total = scatter.size() > 0 ? scatter.size() : 1;
+        int rt = 0, lt = 0, lb = 0, rb = 0;
         double sumX = 0, sumY = 0;
-        Map<String, Integer> emotionCount = new LinkedHashMap<>();
-
-        for (Comment c : comments) {
-            double[] xy = calculateXY(c);
-            sumX += xy[0];
-            sumY += xy[1];
-            String el = classifyEmotionLabel(c.getText(), c.getRatingValue());
-            emotionCount.merge(el, 1, Integer::sum);
-            if (xy[0] < 0 && xy[1] >= 0.5) lt++;
-            else if (xy[0] >= 0 && xy[1] >= 0.5) rt++;
-            else if (xy[0] < 0 && xy[1] < 0.5) lb++;
+        for (Map<String, Object> pt : scatter) {
+            double pol = Number(pt.get("polarity"));
+            double inten = Number(pt.get("intensity"));
+            sumX += pol;
+            sumY += inten;
+            if (pol >= 0 && inten >= 2.5) rt++;
+            else if (pol < 0 && inten >= 2.5) lt++;
+            else if (pol < 0 && inten < 2.5) lb++;
             else rb++;
         }
 
         List<Map<String, Object>> quadrants = new ArrayList<>();
-        quadrants.add(buildQuadrant("压抑/惊悚", "leftTop", lt, total, "该象限代表高强度负面情绪，例如恐惧、压抑、窒息、不安"));
-        quadrants.add(buildQuadrant("热血/高燃", "rightTop", rt, total, "该象限代表高强度正面情绪，例如震撼、兴奋、爽感、热血"));
-        quadrants.add(buildQuadrant("孤独/克制", "leftBottom", lb, total, "该象限代表低强度负面或内敛情绪，例如遗憾、孤独、冷感、克制"));
-        quadrants.add(buildQuadrant("治愈/轻松", "rightBottom", rb, total, "该象限代表低到中强度正面情绪，例如温暖、治愈、轻松、回甘"));
+        quadrants.add(buildQuadrant("狂热好评", "rightTop", rt, total, "高强度正面评价，观众对特定方面高度认可"));
+        quadrants.add(buildQuadrant("强烈差评", "leftTop", lt, total, "高强度负面评价，观众对特定方面强烈不满"));
+        quadrants.add(buildQuadrant("差强人意", "leftBottom", lb, total, "低强度负面评价，观众有保留意见但情绪不激烈"));
+        quadrants.add(buildQuadrant("比较推荐", "rightBottom", rb, total, "低到中强度正面评价，观众温和认可"));
         emotionMap.put("quadrants", quadrants);
 
-        // 情绪重心
         Map<String, Object> centroid = new LinkedHashMap<>();
         double cx = sumX / total;
         double cy = sumY / total;
         centroid.put("x", Math.round(cx * 100) / 100.0);
         centroid.put("y", Math.round(cy * 100) / 100.0);
         String centroidLabel;
-        if (cx >= 0 && cy >= 0.5) centroidLabel = "整体情绪偏正面且强烈，观众反应热烈";
-        else if (cx >= 0 && cy < 0.5) centroidLabel = "整体情绪偏正面但温和，观众认可度平稳";
-        else if (cx < 0 && cy >= 0.5) centroidLabel = "整体情绪偏负面且强烈，争议较大";
-        else centroidLabel = "整体情绪偏负面且克制，观众存在保留意见";
+        if (cx >= 0 && cy >= 2.5) centroidLabel = "整体偏正面且情绪强烈，观众热情高涨";
+        else if (cx >= 0 && cy < 2.5) centroidLabel = "整体偏正面但情绪温和，观众认可度平稳";
+        else if (cx < 0 && cy >= 2.5) centroidLabel = "整体偏负面且情绪强烈，争议较大";
+        else centroidLabel = "整体偏负面但情绪克制，观众有保留意见";
         centroid.put("label", centroidLabel);
         emotionMap.put("centroid", centroid);
 
-        // 主导情绪
-        String dominantEmotion = "中性";
+        // 主导方面
+        Map<String, Integer> aspectCount = new LinkedHashMap<>();
+        for (Map<String, Object> pt : scatter) {
+            String asp = String.valueOf(pt.get("aspect"));
+            aspectCount.merge(asp, 1, Integer::sum);
+        }
+        String dominantAspect = "剧情";
         int maxCount = 0;
-        for (Map.Entry<String, Integer> e : emotionCount.entrySet()) {
-            if (e.getValue() > maxCount) { maxCount = e.getValue(); dominantEmotion = e.getKey(); }
+        for (Map.Entry<String, Integer> e : aspectCount.entrySet()) {
+            if (e.getValue() > maxCount) { maxCount = e.getValue(); dominantAspect = e.getKey(); }
         }
 
-        // 摘要
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("dominantEmotion", dominantEmotion);
-        long posCount = comments.stream().filter(c -> "正面".equals(c.getSentiment())).count();
-        long negCount = comments.stream().filter(c -> "负面".equals(c.getSentiment())).count();
-        int posPercent = (int)(posCount * 100 / total);
-        int negPercent = (int)(negCount * 100 / total);
-        summary.put("distributionSummary", String.format("正面%d%%、负面%d%%，主导情绪为「%s」", posPercent, negPercent, dominantEmotion));
-        summary.put("interpretation", String.format("观众情绪重心位于(%+.2f, %.2f)，%s", cx, cy, centroidLabel));
+        summary.put("dominantAspect", dominantAspect);
+        summary.put("distributionSummary", String.format("讨论最多的是「%s」，狂热好评%d%%，强烈差评%d%%", dominantAspect, rt*100/total, lt*100/total));
+        summary.put("interpretation", String.format("情绪重心(%.1f, %.1f)，%s", cx, cy, centroidLabel));
         emotionMap.put("summary", summary);
 
         return emotionMap;
+    }
+
+    private static double Number(Object obj) {
+        if (obj == null) return 0;
+        try { return Double.parseDouble(obj.toString()); } catch (Exception e) { return 0; }
     }
 
     private static Map<String, Object> buildQuadrant(String name, String position, int count, int total, String desc) {

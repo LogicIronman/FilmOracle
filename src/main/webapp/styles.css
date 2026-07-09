@@ -380,11 +380,11 @@ h3 {
 }
 
 .move-left {
-  animation: marquee-left 72s linear infinite;
+  animation: marquee-left 144s linear infinite;
 }
 
 .move-right {
-  animation: marquee-right 78s linear infinite;
+  animation: marquee-right 156s linear infinite;
 }
 
 .mini-poster,
@@ -636,7 +636,7 @@ h3 {
 
 .keyword-cloud {
   position: relative;
-  min-height: 230px;
+  min-height: 300px;
   overflow: hidden;
   border-radius: var(--radius);
   background:
@@ -649,7 +649,7 @@ h3 {
   position: absolute;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 6px 10px;
+  padding: 8px 14px;
   background: #fff6f0;
   color: var(--accent-active);
   font-weight: 700;
