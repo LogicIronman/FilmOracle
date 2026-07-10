@@ -32,6 +32,9 @@ services:
       DB_USER: filmoracle
       DB_PASSWORD: filmoracle
       JAVA_OPTS: "-Xms256m -Xmx768m -Dfile.encoding=UTF-8"
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - upload_data:/app/uploads
     deploy:
       resources:
         limits:
@@ -39,3 +42,4 @@ services:
 
 volumes:
   mysql_data:
+  upload_data:

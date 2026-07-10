@@ -1,6 +1,7 @@
 package com.filmoracle.web;
 
 import jakarta.servlet.*;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.*;
 import com.filmoracle.service.*;
 import com.filmoracle.util.JsonUtil;
@@ -8,6 +9,10 @@ import com.filmoracle.util.HttpUtil;
 import com.filmoracle.util.FallbackData;
 import com.filmoracle.model.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.regex.*;
 
@@ -17,6 +22,12 @@ import java.util.regex.*;
  * 第三阶段：分析接口（情感分析/图表数据）
  * 第四阶段：AI API 集成 + 海报代理
  */
+@MultipartConfig(
+        location = "/app/uploads",
+        fileSizeThreshold = 1024 * 1024,
+        maxFileSize = 10 * 1024 * 1024,
+        maxRequestSize = 12 * 1024 * 1024
+)
 public class ApiServlet extends HttpServlet {
     private static final Pattern MOVIE_DETAIL = Pattern.compile("^/api/movie/([^/]+)$");
     private static final Pattern MOVIE_INTERESTS = Pattern.compile("^/api/movie/([^/]+)/interests$");
@@ -66,6 +77,18 @@ public class ApiServlet extends HttpServlet {
             }
             List<Map<String, Object>> history = HistoryService.loadHistory(String.valueOf(user.get("username")));
             sendJson(resp, 200, Map.of("ok", true, "history", history));
+            return;
+        }
+
+        // 评论管理 GET：按电影、关键词、情感类型查询已持久化评论
+        if (full.equals("/api/comments")) {
+            List<Map<String, Object>> comments = CommentService.query(
+                    req.getParameter("movie"),
+                    req.getParameter("keyword"),
+                    req.getParameter("sentiment"),
+                    parseInt(req.getParameter("limit"), 100)
+            );
+            sendJson(resp, 200, Map.of("ok", true, "comments", comments, "count", comments.size()));
             return;
         }
 
@@ -193,6 +216,62 @@ public class ApiServlet extends HttpServlet {
         if (full.equals("/api/auth/logout")) {
             AuthService.logout(req);
             sendJson(resp, 200, Map.of("ok", true));
+            return;
+        }
+
+        // POST /api/comments：单条录入或 JSON 批量导入评论
+        if (full.equals("/api/comments")) {
+            Map<String, Object> user = AuthService.checkSession(req);
+            if (user == null) {
+                sendJson(resp, 401, Map.of("ok", false, "error", "请先登录"));
+                return;
+            }
+            try {
+                Map<String, Object> body = readJsonBody(req);
+                Movie movie = movieFromMap((Map<String, Object>) body.get("movie"));
+                List<Comment> comments = commentsFromBody(body);
+                Map<String, Object> result = CommentService.saveBatch(movie, comments, "manual");
+                sendJson(resp, Boolean.TRUE.equals(result.get("ok")) ? 200 : 400, result);
+            } catch (Exception e) {
+                sendJson(resp, 500, Map.of("ok", false, "error", "评论保存失败: " + e.getMessage()));
+            }
+            return;
+        }
+
+        // POST /api/comments/import：上传 CSV/TXT，文件保存在 Docker 导入卷后批量写入数据库
+        if (full.equals("/api/comments/import")) {
+            Map<String, Object> user = AuthService.checkSession(req);
+            if (user == null) {
+                sendJson(resp, 401, Map.of("ok", false, "error", "请先登录"));
+                return;
+            }
+            try {
+                Part filePart = req.getPart("file");
+                if (filePart == null || filePart.getSize() == 0) {
+                    sendJson(resp, 400, Map.of("ok", false, "error", "请选择 CSV 或 TXT 评论文件"));
+                    return;
+                }
+                String originalName = safeFileName(filePart.getSubmittedFileName());
+                if (!(originalName.endsWith(".csv") || originalName.endsWith(".txt"))) {
+                    sendJson(resp, 400, Map.of("ok", false, "error", "仅支持 CSV 或 TXT 评论文件"));
+                    return;
+                }
+                Path storedFile = storeImportFile(filePart, originalName);
+                String content = Files.readString(storedFile, StandardCharsets.UTF_8);
+                List<Comment> comments = parseImportedComments(content, originalName);
+                Movie movie = new Movie();
+                movie.setId(req.getParameter("movieId"));
+                movie.setTitle(req.getParameter("movieTitle"));
+                movie.setYear(valueOr(req.getParameter("year"), ""));
+                movie.setGenre(valueOr(req.getParameter("genre"), ""));
+                Map<String, Object> result = CommentService.saveBatch(movie, comments, "import");
+                Map<String, Object> response = new LinkedHashMap<>(result);
+                response.put("file", storedFile.getFileName().toString());
+                response.put("parsed", comments.size());
+                sendJson(resp, Boolean.TRUE.equals(result.get("ok")) ? 200 : 400, response);
+            } catch (Exception e) {
+                sendJson(resp, 500, Map.of("ok", false, "error", "评论文件导入失败: " + e.getMessage()));
+            }
             return;
         }
 
@@ -340,16 +419,21 @@ public class ApiServlet extends HttpServlet {
                     engine = "rule-based";
                 }
 
+                // 复用现有分析链路，同时把页面已获取的评论批量写入评论管理库。
+                applyAnalyzedLabels(allComments, analysis.getAnalyzedComments());
+                Map<String, Object> persistence = CommentService.saveBatch(movie, allComments, "analysis");
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("source", "analysis");
+                meta.put("engine", engine);
+                meta.put("totalComments", allComments.size());
+                meta.put("analyzedComments", valuableComments.size());
+                meta.put("persistence", persistence);
+
                 Map<String, Object> result = new LinkedHashMap<>();
                 result.put("ok", true);
                 result.put("analysis", analysis);
                 result.put("comments", allComments);
-                result.put("meta", Map.of(
-                    "source", "analysis",
-                    "engine", engine,
-                    "totalComments", allComments.size(),
-                    "analyzedComments", valuableComments.size()
-                ));
+                result.put("meta", meta);
 
                 sendJson(resp, 200, result);
                 System.out.println("[ANALYZE] Done: " + allComments.size() + " total, " + valuableComments.size() + " analyzed, engine=" + engine);
@@ -363,6 +447,181 @@ public class ApiServlet extends HttpServlet {
 
         // 其他 POST 请求走 GET
         doGet(req, resp);
+    }
+
+    private Map<String, Object> readJsonBody(HttpServletRequest req) throws IOException {
+        StringBuilder body = new StringBuilder();
+        try (BufferedReader reader = req.getReader()) {
+            String line;
+            while ((line = reader.readLine()) != null) body.append(line);
+        }
+        if (body.isEmpty()) return new LinkedHashMap<>();
+        return JsonUtil.getMapper().readValue(body.toString(), Map.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Movie movieFromMap(Map<String, Object> data) {
+        Movie movie = new Movie();
+        if (data == null) return movie;
+        movie.setId(JsonUtil.getStr(data, "id", "movieId"));
+        movie.setTitle(JsonUtil.getStr(data, "title", "name", "movieTitle"));
+        movie.setYear(JsonUtil.getStr(data, "year"));
+        movie.setGenre(JsonUtil.getStr(data, "genre"));
+        movie.setRating(JsonUtil.getStr(data, "rating"));
+        movie.setVotes(JsonUtil.getStr(data, "votes", "vote_count"));
+        movie.setDirector(JsonUtil.getStr(data, "director"));
+        movie.setCast(JsonUtil.getStr(data, "cast"));
+        movie.setRegion(JsonUtil.getStr(data, "region"));
+        movie.setLanguage(JsonUtil.getStr(data, "language"));
+        movie.setDate(JsonUtil.getStr(data, "date", "pubdate"));
+        movie.setDuration(JsonUtil.getStr(data, "duration"));
+        movie.setSummary(JsonUtil.getStr(data, "summary"));
+        movie.setPosterUrl(JsonUtil.getStr(data, "posterUrl", "poster_url"));
+        return movie;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Comment> commentsFromBody(Map<String, Object> body) {
+        List<Comment> comments = new ArrayList<>();
+        Object oneComment = body.get("comment");
+        if (oneComment instanceof Map) comments.add(commentFromMap((Map<String, Object>) oneComment));
+        Object listComment = body.get("comments");
+        if (listComment instanceof List) {
+            for (Object item : (List<?>) listComment) {
+                if (item instanceof Map) comments.add(commentFromMap((Map<String, Object>) item));
+            }
+        }
+        return comments;
+    }
+
+    private Comment commentFromMap(Map<String, Object> data) {
+        Comment comment = new Comment();
+        comment.setId(JsonUtil.getStr(data, "id", "commentId"));
+        comment.setText(JsonUtil.getStr(data, "text", "content", "comment"));
+        comment.setRatingValue(JsonUtil.getInt(data, "ratingValue", "rating", 0));
+        comment.setStar(JsonUtil.getStr(data, "star"));
+        comment.setUser(JsonUtil.getStr(data, "user", "name", "userName"));
+        comment.setCreatedAt(JsonUtil.getStr(data, "createdAt", "created_at"));
+        comment.setVoteCount(JsonUtil.getInt(data, "voteCount", "useful_count", 0));
+        comment.setSentiment(JsonUtil.getStr(data, "sentiment"));
+        comment.setAspect(JsonUtil.getStr(data, "aspect"));
+        comment.setQuadrant(JsonUtil.getStr(data, "quadrant"));
+        return comment;
+    }
+
+    private void applyAnalyzedLabels(List<Comment> comments, List<Map<String, Object>> analyzedComments) {
+        if (analyzedComments == null || analyzedComments.isEmpty()) return;
+        Map<String, Map<String, Object>> byId = new HashMap<>();
+        for (Map<String, Object> analyzed : analyzedComments) {
+            String id = JsonUtil.getStr(analyzed, "id");
+            if (!id.isBlank()) byId.put(id, analyzed);
+        }
+        for (Comment comment : comments) {
+            Map<String, Object> analyzed = byId.get(comment.getId());
+            if (analyzed == null) continue;
+            comment.setSentiment(JsonUtil.getStr(analyzed, "sentiment"));
+            comment.setAspect(JsonUtil.getStr(analyzed, "aspect"));
+            comment.setQuadrant(JsonUtil.getStr(analyzed, "quadrant"));
+        }
+    }
+
+    private Path storeImportFile(Part filePart, String originalName) throws IOException {
+        Path uploadDir = Path.of(valueOr(System.getenv("UPLOAD_DIR"), "/app/uploads"));
+        Files.createDirectories(uploadDir);
+        String storedName = System.currentTimeMillis() + "-" + UUID.randomUUID() + "-" + originalName;
+        Path target = uploadDir.resolve(storedName);
+        try (InputStream input = filePart.getInputStream()) {
+            Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return target;
+    }
+
+    private String safeFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) return "comments.txt";
+        String name = Path.of(fileName).getFileName().toString().replaceAll("[\\r\\n\\\\/:*?\"<>|]", "_");
+        return name.isBlank() ? "comments.txt" : name;
+    }
+
+    private List<Comment> parseImportedComments(String content, String fileName) {
+        List<Comment> comments = new ArrayList<>();
+        String[] lines = content.split("\\R");
+        boolean csv = fileName.toLowerCase(Locale.ROOT).endsWith(".csv");
+        int start = 0;
+        int textColumn = 0;
+        int ratingColumn = -1;
+        int userColumn = -1;
+        if (csv && lines.length > 0) {
+            List<String> header = parseCsvRow(lines[0]);
+            boolean hasHeader = false;
+            for (int i = 0; i < header.size(); i++) {
+                String value = header.get(i).trim().toLowerCase(Locale.ROOT);
+                if (value.contains("text") || value.contains("comment") || value.contains("评论")) {
+                    textColumn = i;
+                    hasHeader = true;
+                }
+                if (value.contains("rating") || value.contains("star") || value.contains("星级")) ratingColumn = i;
+                if (value.contains("user") || value.contains("name") || value.contains("用户")) userColumn = i;
+            }
+            if (hasHeader) start = 1;
+        }
+        for (int lineIndex = start; lineIndex < lines.length; lineIndex++) {
+            String line = lines[lineIndex].trim();
+            if (line.isEmpty()) continue;
+            String text = line;
+            String user = "导入用户";
+            int rating = 3;
+            if (csv) {
+                List<String> cells = parseCsvRow(line);
+                if (textColumn >= cells.size()) continue;
+                text = cells.get(textColumn).trim();
+                if (ratingColumn >= 0 && ratingColumn < cells.size()) rating = parseImportRating(cells.get(ratingColumn), rating);
+                if (userColumn >= 0 && userColumn < cells.size() && !cells.get(userColumn).isBlank()) user = cells.get(userColumn).trim();
+            } else {
+                Matcher star = Pattern.compile("^([1-5])\\s*星\\s*(.*)$").matcher(text);
+                if (star.matches()) {
+                    rating = Integer.parseInt(star.group(1));
+                    text = star.group(2).trim();
+                }
+            }
+            if (text.length() < 2) continue;
+            Comment comment = new Comment();
+            comment.setId("import-" + (lineIndex + 1));
+            comment.setText(text);
+            comment.setRatingValue(rating);
+            comment.setStar(rating + "星");
+            comment.setUser(user);
+            comments.add(comment);
+        }
+        return comments;
+    }
+
+    private List<String> parseCsvRow(String line) {
+        List<String> cells = new ArrayList<>();
+        StringBuilder cell = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char current = line.charAt(i);
+            if (current == '"') {
+                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    cell.append('"');
+                    i++;
+                } else quoted = !quoted;
+            } else if (current == ',' && !quoted) {
+                cells.add(cell.toString());
+                cell.setLength(0);
+            } else cell.append(current);
+        }
+        cells.add(cell.toString());
+        return cells;
+    }
+
+    private int parseImportRating(String value, int fallback) {
+        Matcher matcher = Pattern.compile("[1-5]").matcher(value == null ? "" : value);
+        return matcher.find() ? Integer.parseInt(matcher.group()) : fallback;
+    }
+
+    private String valueOr(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     /**
