@@ -7,22 +7,22 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
  */
 @JsonPropertyOrder({"id","title","year","genre","rating","votes","director","cast","region","language","date","duration","summary","posterUrl","poster","source"})
 public class Movie {
-    private String id;
-    private String title;
-    private String year;
-    private String genre;
-    private String rating;
-    private String votes;
-    private String director;
-    private String cast;
-    private String region;
-    private String language;
-    private String date;
-    private String duration;
-    private String summary;
-    private String posterUrl;
-    private String poster;
-    private String source;
+    private String id = "";
+    private String title = "";
+    private String year = "";
+    private String genre = "";
+    private String rating = "";
+    private String votes = "";
+    private String director = "";
+    private String cast = "";
+    private String region = "";
+    private String language = "";
+    private String date = "";
+    private String duration = "";
+    private String summary = "";
+    private String posterUrl = "";
+    private String poster = "";
+    private String source = "";
 
     public Movie() {}
 
