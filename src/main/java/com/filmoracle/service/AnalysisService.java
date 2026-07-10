@@ -484,7 +484,7 @@ public class AnalysisService {
     // 策略：对每条评论检测提及的方面，计算该方面的polarity和intensity，
     // 然后将相同方面+相近情感(polarity四舍五入到0.5，intensity四舍五入到0.5)的评论聚合为一个点，
     // votes = 聚合的评论条数（表示有多少条评论表达了相似情感），点越大代表越多评论持相同看法
-    private static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
+    public static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
         Map<String, Map<String, Object>> clusters = new LinkedHashMap<>();
 
         for (Comment c : comments) {
@@ -578,7 +578,7 @@ public class AnalysisService {
 
     // ─── 情绪分布图（新四象限，加权统计）───
     // 使用散点聚合数据，按 votes（聚合评论数）加权统计象限，使统计结果反映真实评论分布
-    private static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
+    public static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
         Map<String, Object> emotionMap = new LinkedHashMap<>();
         Map<String, String> axis = new LinkedHashMap<>();
         axis.put("x", "差评 ← polarity → 好评");

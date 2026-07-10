@@ -1085,7 +1085,17 @@ function renderCharts() {
   `).join("");
 
   // ── 观众情绪分布图（方面级散点）──
-  const em = currentAnalysis.emotionMap || {};
+  // 如果散点太少（AI返回不足或无AI），用本地聚合引擎补充
+  let scatterData = Array.isArray(currentAnalysis.scatter) ? currentAnalysis.scatter : [];
+  let emotionMapData = currentAnalysis.emotionMap || {};
+  if (scatterData.length < 15 && currentComments.length > 0) {
+    const localScatter = buildLocalScatter(currentComments);
+    if (localScatter.length > scatterData.length) {
+      scatterData = localScatter;
+      emotionMapData = buildLocalEmotionMap(localScatter);
+    }
+  }
+  const em = emotionMapData;
   const quads = em.quadrants || [];
   const centroid = em.centroid || { x: 0, y: 0 };
   const emSummary = em.summary || {};
@@ -1118,18 +1128,19 @@ function renderCharts() {
   }).join("");
 
   // 方面级散点（点大小用sqrt缩放，votes=聚合评论数）
-  const points = currentAnalysis.scatter.map((point, idx) => {
+  const points = scatterData.map((point, idx) => {
     const cx = polToX(point.polarity || 0);
     const cy = intToY(point.intensity || 0);
     const aspect = point.aspect || "剧情";
     const fill = aspectColors[aspect] || "#908f8b";
     const votes = point.votes || 1;
-    // sqrt缩放：votes=1→r≈7, votes=5→r≈11, votes=10→r≈15, votes=20→r≈19
-    const r = Math.max(3.5, Math.min(20, 3.5 + Math.sqrt(votes) * 3.5));
-    const opacity = Math.max(0.5, Math.min(0.85, 0.5 + votes * 0.03));
+    // sqrt缩放：votes=1→r≈11, votes=3→r≈14, votes=5→r≈16, votes=10→r≈21, votes=20→r≈24
+    const r = Math.max(6, Math.min(24, 6 + Math.sqrt(votes) * 5));
+    const opacity = Math.max(0.55, Math.min(0.9, 0.55 + votes * 0.035));
     const text = point.text ? escapeHtml(point.text.substring(0, 40)) : "";
-    const strokeW = votes >= 5 ? 1.5 : 0.8;
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${fill}" fill-opacity="${opacity}" stroke="${fill}" stroke-opacity="0.3" stroke-width="${strokeW}" style="animation-delay:${idx * 15}ms"><title>${escapeHtml(aspect)}｜polarity=${point.polarity}｜intensity=${point.intensity}｜${votes}条相似评论｜${text}</title></circle>`;
+    const strokeW = votes >= 5 ? 2 : 1;
+    const showLabel = votes >= 3 && r >= 12;
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${fill}" fill-opacity="${opacity}" stroke="${fill}" stroke-opacity="0.4" stroke-width="${strokeW}" style="animation-delay:${idx * 12}ms"><title>${escapeHtml(aspect)}｜polarity=${point.polarity}｜intensity=${point.intensity}｜${votes}条相似评论｜${text}</title></circle>${showLabel ? `<text x="${cx.toFixed(1)}" y="${(cy + 3).toFixed(1)}" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" pointer-events="none">${votes}</text>` : ""}`;
   }).join("");
 
   // 情绪重心

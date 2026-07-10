@@ -184,11 +184,19 @@ public class AiService {
             // radar
             result.setRadar(extractObjectArrayList(aiResult, "radar"));
 
-            // scatter
-            result.setScatter(extractScatterList(aiResult));
+            // scatter — AI返回太少时回退到本地聚合引擎
+            List<Map<String, Object>> scatter = extractScatterList(aiResult);
+            if (scatter == null || scatter.size() < 15) {
+                System.out.println("[AI] Scatter too few (" + (scatter != null ? scatter.size() : 0) + "), using local engine aggregation");
+                scatter = AnalysisService.calculateScatter(comments);
+            }
+            result.setScatter(scatter);
 
-            // emotionMap (if AI returns it)
+            // emotionMap — AI未返回或散点已替换时用本地引擎
             Map<String, Object> emotionMap = (Map<String, Object>) aiResult.get("emotionMap");
+            if (emotionMap == null) {
+                emotionMap = AnalysisService.calculateEmotionMap(comments);
+            }
             if (emotionMap != null) {
                 result.setEmotionMap(emotionMap);
             }
