@@ -394,28 +394,28 @@ public class ApiServlet extends HttpServlet {
                 }
                 if (movie.getTitle().isEmpty()) movie = FallbackData.getFallbackMovies().get(0);
 
-                // 使用本次爬取到的全部有效评论参与分析。展示版需要让 AI 看到完整口碑分布，
-                // 只过滤空文本，不再固定截断 50 条。
-                List<Comment> valuableComments = AnalysisService.filterValuableComments(allComments, allComments.size());
+                // AI 与规则引擎都使用本次请求携带的完整评论列表：不再按数量截断或筛选。
+                // 这样前端单次抓取多少条，AI 就收到多少条。
+                List<Comment> analysisComments = new ArrayList<>(allComments);
 
                 AnalysisResult analysis;
                 String engine;
 
                 // 如果有 API Key，尝试用 AI 分析
                 if (apiKey != null && !apiKey.isBlank() && !apiKey.startsWith("sk-***")) {
-                    System.out.println("[ANALYZE] Using AI: model=" + aiModel + ", comments=" + valuableComments.size());
-                    analysis = AiService.analyzeWithAi(valuableComments, movie, apiKey, aiModel, aiPrompt, apiUrl);
+                    System.out.println("[ANALYZE] Using AI: model=" + aiModel + ", comments=" + analysisComments.size());
+                    analysis = AiService.analyzeWithAi(analysisComments, movie, apiKey, aiModel, aiPrompt, apiUrl);
                     if (analysis != null) {
                         engine = "ai:" + aiModel;
                         System.out.println("[ANALYZE] AI analysis succeeded");
                     } else {
                         System.out.println("[ANALYZE] AI analysis failed, falling back to rule-based");
-                        analysis = AnalysisService.analyze(valuableComments, movie);
+                        analysis = AnalysisService.analyze(analysisComments, movie);
                         engine = "rule-based (AI failed)";
                     }
                 } else {
                     System.out.println("[ANALYZE] No API key, using rule-based engine");
-                    analysis = AnalysisService.analyze(valuableComments, movie);
+                    analysis = AnalysisService.analyze(analysisComments, movie);
                     engine = "rule-based";
                 }
 
@@ -426,7 +426,7 @@ public class ApiServlet extends HttpServlet {
                 meta.put("source", "analysis");
                 meta.put("engine", engine);
                 meta.put("totalComments", allComments.size());
-                meta.put("analyzedComments", valuableComments.size());
+                meta.put("analyzedComments", analysisComments.size());
                 meta.put("persistence", persistence);
 
                 Map<String, Object> result = new LinkedHashMap<>();
@@ -436,7 +436,7 @@ public class ApiServlet extends HttpServlet {
                 result.put("meta", meta);
 
                 sendJson(resp, 200, result);
-                System.out.println("[ANALYZE] Done: " + allComments.size() + " total, " + valuableComments.size() + " analyzed, engine=" + engine);
+                System.out.println("[ANALYZE] Done: " + allComments.size() + " total, " + analysisComments.size() + " analyzed, engine=" + engine);
             } catch (Exception e) {
                 System.err.println("[ANALYZE ERROR] " + e.getMessage());
                 e.printStackTrace();

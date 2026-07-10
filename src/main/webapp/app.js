@@ -1660,7 +1660,7 @@ async function openMovie(id) {
   }
 }
 
-async function loadCommentsAndAnalyze(runAnalysis = false) {
+async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false) {
   if (!requireAuth()) return;
   if (!currentMovie) {
     setTask(["> 请先搜索并选择一部电影，或从导入评论入口创建来源电影。"], "no movie");
@@ -1690,7 +1690,12 @@ async function loadCommentsAndAnalyze(runAnalysis = false) {
   if (data.meta?.error) appendTask(`> ! 豆瓣 API 不可用: ${data.meta.error}`);
 
   // ─── Step 2: 分析评论 ───
-  if (runAnalysis) {
+  if (useLocalRules) {
+    appendTask(`> [2/3] 使用本地规则引擎分析全部 ${currentComments.length} 条评论...`, "filtering");
+    currentAnalysis = buildAnalysis(currentComments, currentMovie);
+    currentComments = applyAnalysisToComments(currentComments, currentAnalysis);
+    appendTask(`> [2/3] 本地规则分析完成: ${currentComments.length} / ${currentComments.length} 条评论`, "analysis ready");
+  } else if (runAnalysis) {
     const hasApiKey = settings.apiKey && settings.apiKey.trim() && !settings.apiKey.startsWith("sk-***");
     appendTask(`> [2/3] 筛选有价值评论...`, "filtering");
 
@@ -1923,7 +1928,7 @@ function bindEvents() {
     importMovieFromForm(event.currentTarget);
   });
 
-  $("#fetch-comments").addEventListener("click", () => void loadCommentsAndAnalyze(false));
+  $("#fetch-comments").addEventListener("click", () => void loadCommentsAndAnalyze(false, true));
   $("#fetch-analyze").addEventListener("click", () => void loadCommentsAndAnalyze(true));
   $("#export-comments").addEventListener("click", exportComments);
   $("#export-pdf").addEventListener("click", exportPdfReport);
