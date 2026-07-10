@@ -48,6 +48,7 @@ FilmOracle/
 │   ├── service/
 │   │   ├── DoubanApiService.java        豆瓣数据服务（搜索/详情/评论/标签/Top）
 │   │   ├── AnalysisService.java         评论分析引擎（情感/关键词/雷达/散点）
+│   │   ├── CommentService.java          评论单条/批量持久化与分类查询
 │   │   └── CacheService.java            内存缓存（带 TTL）
 │   │
 │   └── web/
@@ -59,6 +60,7 @@ FilmOracle/
 │
 └── src/main/webapp/
     ├── WEB-INF/web.xml                  Servlet 映射 + 过滤器配置
+    ├── index.jsp                        JSP 服务端展示入口（复用既有页面）
     ├── index.html                       单页应用（6个视图）
     ├── styles.css                       设计系统（Claude/Anthropic 风格）
     ├── app.js                           前端逻辑（搜索/详情/分析/筛选）
@@ -115,6 +117,14 @@ mvn clean package
 |------|------|------|
 | POST | `/api/analyze` | 评论分析，返回情感/关键词/雷达/散点/摘要 |
 
+### 评论管理接口（第四阶段）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/comments?movie=&keyword=&sentiment=&limit=` | 按电影名称、关键词、情感类型查询已入库评论 |
+| POST | `/api/comments` | 单条录入或 JSON 批量写入评论 |
+| POST | `/api/comments/import` | 上传 CSV/TXT，文件保存到 Docker 卷并批量写入 MySQL |
+
 **POST /api/analyze 请求体：**
 
 ```json
@@ -166,6 +176,12 @@ MySQL 数据库包含 7 张表：
 
 默认管理员：`admin` / `admin123`
 
+评论通过 `CommentService` 使用 JDBC 事务批量写入 `comment` 表；电影信息以 `movie_cache` 为分类主表，支持按电影名称、关键词和情感类型查询。
+
+## 导入文件持久化
+
+Docker Compose 使用 `upload_data` 卷挂载到 Tomcat 容器的 `/app/uploads`。通过 `/api/comments/import` 上传的 CSV/TXT 会先写入该目录，再解析并批量保存；容器重建后导入文件仍可保留。
+
 ## 稳定性保障
 
 - 每个豆瓣 API 请求都有指数退避重试（最多 2 次）
@@ -181,4 +197,4 @@ MySQL 数据库包含 7 张表：
 | 第一阶段 | 前端原型（6个视图 + mock 数据） | ✅ 完成 |
 | 第二阶段 | Java 后端 + 豆瓣 API 对接 + 缓存 + 兜底 | ✅ 完成 |
 | 第三阶段 | 服务端分析引擎 + 图表数据生成 + 前端联调 | ✅ 完成 |
-| 第四阶段 | MySQL 持久化 + JDBC + Docker 部署优化 | 待开发 |
+| 第四阶段 | MySQL 持久化 + JDBC 评论管理 + Docker 导入卷 + 验收测试 | ✅ 完成 |
