@@ -306,6 +306,7 @@ public class AiService {
      */
     private static List<Map<String, Object>> buildAnalyzedComments(List<Comment> comments) {
         List<Map<String, Object>> analyzed = new ArrayList<>();
+        AnalysisService.applyRuleLabels(comments);
         for (int i = 0; i < comments.size(); i++) {
             Comment c = comments.get(i);
             Map<String, Object> item = new LinkedHashMap<>();

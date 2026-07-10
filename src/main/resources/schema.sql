@@ -93,6 +93,19 @@ CREATE TABLE IF NOT EXISTS movie_analysis_summary (
     FOREIGN KEY (movie_id) REFERENCES movie_cache(id)
 );
 
+-- AI 分析缓存：相同电影、完整评论集、模型和提示词可直接恢复，不重复调用远程 AI
+CREATE TABLE IF NOT EXISTS ai_analysis_cache (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    movie_key VARCHAR(255) NOT NULL,
+    comment_fingerprint CHAR(64) NOT NULL,
+    ai_model VARCHAR(100) NOT NULL,
+    prompt_fingerprint CHAR(64) NOT NULL,
+    analysis_json LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_ai_analysis_cache (movie_key, comment_fingerprint, ai_model, prompt_fingerprint)
+);
+
 -- 用户浏览历史表（直接存储电影信息，无需外键关联）
 CREATE TABLE IF NOT EXISTS user_history (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

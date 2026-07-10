@@ -6,6 +6,8 @@ import com.filmoracle.model.Movie;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,6 +42,38 @@ class AnalysisServiceTest {
         assertFalse(result.getScatter().isEmpty());
         assertNotNull(result.getSentimentDistribution());
         assertTrue(((Number) result.getSummary().get("positiveRate")).intValue() > 0);
+    }
+
+    @Test
+    void classifiesStrongNegativeWordingAsNegativeEvenWithHighStarRating() {
+        Movie movie = new Movie();
+        movie.setTitle("情感规则验收电影");
+        Comment comment = comment("high-star-negative", "画面很好，但中段拖沓又尴尬，结尾尤其失望。", 4);
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("负面", comment.getSentiment());
+    }
+
+    @Test
+    void appliesRuleLabelsForAiCommentDetails() {
+        Comment comment = comment("ai-high-star-negative", "中段拖沓又尴尬，结尾尤其失望。", 4);
+
+        AnalysisService.applyRuleLabels(List.of(comment));
+
+        assertEquals("负面", comment.getSentiment());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aiDetailBuilderUsesTheSameNegativeRule() throws Exception {
+        Comment comment = comment("ai-detail-negative", "中段拖沓又尴尬，结尾尤其失望。", 4);
+        Method builder = AiService.class.getDeclaredMethod("buildAnalyzedComments", List.class);
+        builder.setAccessible(true);
+
+        List<Map<String, Object>> details = (List<Map<String, Object>>) builder.invoke(null, List.of(comment));
+
+        assertEquals("负面", details.getFirst().get("sentiment"));
     }
 
     private Comment comment(String id, String text, int rating) {

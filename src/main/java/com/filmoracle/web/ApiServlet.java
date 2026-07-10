@@ -400,13 +400,26 @@ public class ApiServlet extends HttpServlet {
 
                 AnalysisResult analysis;
                 String engine;
+                boolean cacheHit = false;
+                String cachedAt = "";
 
+                Optional<AiAnalysisCacheService.CachedAnalysis> cached =
+                        AiAnalysisCacheService.find(movie, analysisComments, aiModel, aiPrompt);
+                if (cached.isPresent()) {
+                    analysis = cached.get().analysis();
+                    engine = "ai-cache:" + aiModel;
+                    cacheHit = true;
+                    cachedAt = cached.get().cachedAt();
+                    System.out.println("[ANALYZE] Restored AI cache: model=" + aiModel + ", comments=" + analysisComments.size());
+                }
                 // 如果有 API Key，尝试用 AI 分析
-                if (apiKey != null && !apiKey.isBlank() && !apiKey.startsWith("sk-***")) {
+                else if (apiKey != null && !apiKey.isBlank() && !apiKey.startsWith("sk-***")) {
                     System.out.println("[ANALYZE] Using AI: model=" + aiModel + ", comments=" + analysisComments.size());
                     analysis = AiService.analyzeWithAi(analysisComments, movie, apiKey, aiModel, aiPrompt, apiUrl);
                     if (analysis != null) {
                         engine = "ai:" + aiModel;
+                        analysis.setEngine(engine);
+                        AiAnalysisCacheService.save(movie, analysisComments, aiModel, aiPrompt, analysis);
                         System.out.println("[ANALYZE] AI analysis succeeded");
                     } else {
                         System.out.println("[ANALYZE] AI analysis failed, falling back to rule-based");
@@ -427,6 +440,8 @@ public class ApiServlet extends HttpServlet {
                 meta.put("engine", engine);
                 meta.put("totalComments", allComments.size());
                 meta.put("analyzedComments", analysisComments.size());
+                meta.put("cacheHit", cacheHit);
+                if (cacheHit) meta.put("cachedAt", cachedAt);
                 meta.put("persistence", persistence);
 
                 Map<String, Object> result = new LinkedHashMap<>();

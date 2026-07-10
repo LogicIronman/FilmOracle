@@ -1195,6 +1195,70 @@ function buildLocalReview(comments, movie, keywords, positive, negative) {
   return `《${movie.title}》在评论中呈现出的核心面貌，是一部被观众围绕“${top}”反复讨论的作品。正面评论约占${posRate}%，其中有观众提到“${samplePositive.slice(0, 38)}”，说明影片的有效记忆点不是抽象的好看，而是落在具体段落、情绪释放或叙事设计上。负面评论约占${negRate}%，${sampleNegative ? `也有人指出“${sampleNegative.slice(0, 36)}”，暴露出部分观众对逻辑、节奏或表达方式的保留。` : "目前明显批评较少，争议主要来自不同观众对题材和表达强度的接受度。"}横向看，本片更适合和同题材高口碑作品比较其叙事密度、情绪落点和主题表达，而不是只看评分高低。综合而言，它适合愿意从评论细节中捕捉主题和形式关系的观众；独特价值在于让观众讨论具体场景和手法，而不只是停留在泛泛的类型评价。`;
 }
 
+function renderKeywordCloud() {
+  const cloud = $("#keyword-cloud");
+  const keywords = [...(currentAnalysis.keywords || [])]
+    .sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0));
+  if (!keywords.length) {
+    cloud.innerHTML = `<span style="left:50%;top:50%;font-size:15px">等待评论分析</span>`;
+    return;
+  }
+
+  const maxKeyword = Math.max(1, ...keywords.map(([, count]) => Number(count) || 1));
+  const coreSlots = [
+    [50, 47, -3], [26, 37, 6], [74, 37, -7], [31, 67, -5], [69, 67, 5]
+  ];
+  const outerSlots = [
+    [12, 14, -6], [30, 15, 5], [50, 13, -2], [70, 15, 7], [88, 14, -5],
+    [12, 30, 4], [88, 30, -7], [12, 47, -4], [88, 47, 6],
+    [12, 64, 7], [88, 64, -5], [12, 81, -6], [30, 84, 4], [50, 87, -3],
+    [70, 84, 6], [88, 81, -4], [22, 23, 3], [78, 23, -5],
+    [22, 76, -4], [78, 76, 5], [42, 27, 6], [58, 27, -6],
+    [42, 77, -5], [58, 77, 4], [38, 58, 7], [62, 58, -7],
+    [38, 39, -5], [62, 39, 5], [24, 54, 4], [76, 54, -4]
+  ];
+  const placed = [];
+  cloud.innerHTML = "";
+
+  keywords.forEach(([word, count], index) => {
+    const item = document.createElement("span");
+    const size = 14 + Math.round((Number(count) || 1) / maxKeyword * 22);
+    const opacity = 0.74 + Math.min(0.26, (Number(count) || 1) / maxKeyword * 0.26);
+    item.textContent = word;
+    item.style.cssText = `font-size:${size}px;opacity:${opacity};visibility:hidden;z-index:${index < 5 ? 105 - index : 20};--kw-opacity:${opacity};animation-delay:${index * 45}ms`;
+    cloud.appendChild(item);
+
+    const width = item.offsetWidth;
+    const height = item.offsetHeight;
+    const orderedOuterSlots = outerSlots.map((slot, offset) => outerSlots[(index + offset) % outerSlots.length]);
+    const candidates = index < coreSlots.length ? [coreSlots[index], ...orderedOuterSlots] : orderedOuterSlots;
+    const position = candidates.find(([left, top]) => keywordRectFits(left, top, width, height, cloud, placed, 8));
+    if (!position) {
+      item.remove();
+      return;
+    }
+
+    const [left, top, rotate] = position;
+    placed.push(keywordRect(left, top, width, height, cloud));
+    item.style.left = `${left}%`;
+    item.style.top = `${top}%`;
+    item.style.setProperty("--rotate", `${rotate}deg`);
+    item.style.visibility = "visible";
+  });
+}
+
+function keywordRect(leftPercent, topPercent, width, height, container) {
+  const edge = 8;
+  const centerX = Math.max(width / 2 + edge, Math.min(container.clientWidth - width / 2 - edge, container.clientWidth * leftPercent / 100));
+  const centerY = Math.max(height / 2 + edge, Math.min(container.clientHeight - height / 2 - edge, container.clientHeight * topPercent / 100));
+  return { left: centerX - width / 2, top: centerY - height / 2, right: centerX + width / 2, bottom: centerY + height / 2 };
+}
+
+function keywordRectFits(leftPercent, topPercent, width, height, container, placed, gap) {
+  const rect = keywordRect(leftPercent, topPercent, width, height, container);
+  return !placed.some((other) => rect.left < other.right + gap && rect.right + gap > other.left && rect.top < other.bottom + gap && rect.bottom + gap > other.top);
+}
+
 function renderCharts() {
   // Trigger panel refresh animation
   document.querySelectorAll(".analysis-panel").forEach(panel => {
@@ -1202,24 +1266,7 @@ function renderCharts() {
     void panel.offsetWidth;
     panel.classList.add("refresh");
   });
-  const maxKeyword = Math.max(1, ...currentAnalysis.keywords.map(([, count]) => Number(count) || 1));
-  const cloudPositions = [
-    [50, 50, -4], [28, 32, 7], [72, 32, -9], [22, 65, -6], [78, 65, 8],
-    [48, 22, 3], [40, 78, -10], [60, 78, 5], [16, 45, 9], [84, 45, -7],
-    [34, 15, -4], [66, 15, 6], [14, 82, 3], [86, 82, -5], [52, 88, 8],
-    [36, 52, -8], [64, 52, 4], [50, 62, -2], [24, 24, 5], [76, 24, -5],
-    [42, 38, 8], [58, 42, -6], [30, 72, 4], [70, 72, -8], [46, 85, 6],
-    [20, 58, -3], [80, 58, 3], [38, 28, 9], [62, 68, -4], [50, 15, 0]
-  ];
-  $("#keyword-cloud").innerHTML = currentAnalysis.keywords.length
-    ? currentAnalysis.keywords.map(([word, count], index) => {
-      const [left, top, rotate] = cloudPositions[index % cloudPositions.length];
-      const size = 14 + Math.round((Number(count) || 1) / maxKeyword * 26);
-      const opacity = 0.74 + Math.min(0.26, (Number(count) || 1) / maxKeyword * 0.26);
-      const emphasis = index < 5 ? "color:#d97757;font-weight:700;" : "";
-      return `<span style="left:${left}%;top:${top}%;font-size:${size}px;opacity:${opacity};${emphasis}--rotate:${rotate}deg;--kw-opacity:${opacity};animation-delay:${index * 60}ms">${escapeHtml(word)}</span>`;
-    }).join("")
-    : `<span style="left:50%;top:50%;font-size:15px">等待评论分析</span>`;
+  renderKeywordCloud();
 
   $("#rating-bars").innerHTML = renderRatingColumnChart(currentAnalysis.ratingDistribution);
   $("#comparison-bars").innerHTML = currentAnalysis.comparison.map(([label, value], idx) => `
@@ -1728,6 +1775,9 @@ async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false
         const engine = analysisData.meta?.engine || "unknown";
         const analyzed = analysisData.meta?.analyzedComments || currentComments.length;
         appendTask(`> [2/3] 分析完成! 引擎: ${engine}`, "analysis ready");
+        if (analysisData.meta?.cacheHit) {
+          appendTask(`> > 已恢复数据库缓存结果，未重复调用 AI${analysisData.meta?.cachedAt ? `（缓存时间: ${analysisData.meta.cachedAt}）` : ""}`);
+        }
         appendTask(`> > 分析评论数: ${analyzed} / 总评论数: ${currentComments.length}`);
         if (currentAnalysis.review) {
           appendTask(`> > AI 评析已生成: ${currentAnalysis.review.length} 字`);

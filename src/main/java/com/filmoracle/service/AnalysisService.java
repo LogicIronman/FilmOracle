@@ -173,6 +173,7 @@ public class AnalysisService {
      */
     public static AnalysisResult analyze(List<Comment> comments, Movie movie) {
         AnalysisResult result = new AnalysisResult();
+        applyRuleLabels(comments);
 
         // 1. 分析每条评论
         List<Map<String, Object>> analyzedComments = new ArrayList<>();
@@ -180,9 +181,9 @@ public class AnalysisService {
             Comment c = comments.get(i);
             Map<String, Object> analyzed = new LinkedHashMap<>();
             analyzed.put("id", c.getId());
-            analyzed.put("sentiment", classifySentiment(c));
-            analyzed.put("aspect", classifyAspect(c.getText()));
-            analyzed.put("quadrant", classifyQuadrant(c.getText(), c.getRatingValue()));
+            analyzed.put("sentiment", c.getSentiment());
+            analyzed.put("aspect", c.getAspect());
+            analyzed.put("quadrant", c.getQuadrant());
 
             // 情绪坐标
             double[] xy = calculateXY(c);
@@ -192,11 +193,6 @@ public class AnalysisService {
             // 关键词
             analyzed.put("keywords", extractCommentKeywords(c.getText()));
             analyzed.put("confidence", calculateConfidence(c));
-
-            // 同步到 Comment 对象
-            c.setSentiment((String) analyzed.get("sentiment"));
-            c.setAspect((String) analyzed.get("aspect"));
-            c.setQuadrant((String) analyzed.get("quadrant"));
 
             analyzedComments.add(analyzed);
         }
@@ -302,14 +298,24 @@ public class AnalysisService {
     }
 
     // ─── 情感分类 ───
+    public static void applyRuleLabels(List<Comment> comments) {
+        if (comments == null) return;
+        for (Comment comment : comments) {
+            comment.setSentiment(classifySentiment(comment));
+            comment.setAspect(classifyAspect(comment.getText()));
+            comment.setQuadrant(classifyQuadrant(comment.getText(), comment.getRatingValue()));
+        }
+    }
+
     private static String classifySentiment(Comment c) {
-        if (c.getRatingValue() >= 4) return "正面";
-        if (c.getRatingValue() <= 2) return "负面";
-        // 3星根据文本判断
         int pos = countMatches(c.getText(), POSITIVE_WORDS);
         int neg = countMatches(c.getText(), NEGATIVE_WORDS);
-        if (pos > neg + 1) return "正面";
-        if (neg > pos + 1) return "负面";
+
+        // 明确且更强的文本情绪优先于星级，避免“4星但拖沓、失望”等保留意见被误标为正面。
+        if (neg >= pos + 2) return "负面";
+        if (pos >= neg + 2) return "正面";
+        if (c.getRatingValue() >= 4) return "正面";
+        if (c.getRatingValue() <= 2) return "负面";
         return "中性";
     }
 
