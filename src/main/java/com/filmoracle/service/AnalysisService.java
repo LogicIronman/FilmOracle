@@ -55,29 +55,62 @@ public class AnalysisService {
     private static final Pattern QUADRANT_HEALING = Pattern.compile("治愈|轻松|温暖|舒服|可爱|温馨|柔软|明朗|甜蜜");
 
     private static final Set<String> GENERIC_KEYWORDS = new HashSet<>(java.util.Arrays.asList(
-            "电影", "影片", "真的", "感觉", "觉得", "一个", "这个", "就是", "还是", "没有", "不是",
-            "非常", "比较", "有点", "剧情", "演技", "画面", "导演", "演员", "故事", "角色", "配乐",
-            "镜头", "表演", "主题", "节奏", "音乐", "时候", "因为", "所以", "但是", "可以", "观众",
-            "这部", "一片", "看了", "看完", "一种", "一些", "这种", "那种",
-            "什么", "怎么", "为什么", "怎么样",
-            "两个", "三个", "他们", "我们", "你们", "自己", "别人", "大家", "所有",
-            "一直", "已经", "或者", "而且", "然后", "后来", "最后", "开始", "出现",
-            "这是", "那是", "还有", "如果", "虽然", "不过", "其实", "这样", "那样",
-            "不得", "不到", "不会", "不能", "不要", "不用", "不行", "无关",
-            "很多", "很少", "特别", "确实", "相对", "一般", "普通",
-            "好看", "不好", "不错", "还行", "太差", "太好", "说是", "来说", "对于",
-            "这么", "看的", "的是", "这是", "有的", "一样", "的话", "似的", "有些", "也是",
-            "都是", "不算", "而是", "本来", "原来", "其实", "出来", "起来", "下去", "过来",
-            "看过", "看着", "看了一", "看了两", "看了三", "看完这", "看完那",
-            "只能说", "不知道", "不觉得", "不至于", "不至于", "不至于",
-            "那个", "那个", "这个", "那些", "这些", "此片", "该片", "此剧", "本片",
-            "完全不", "并不", "并非", "并非是", "并不是", "不算太", "不算很",
+            // ─ 影视/片名泛称 ─
+            "电影", "影片", "这部", "一片", "此片", "该片", "此剧", "本片", "整个", "整部", "一部",
+            // ─ 人称/指示代词 ─
+            "一个", "两个", "三个", "他们", "我们", "你们", "自己", "别人", "大家", "所有",
+            "每个", "各自", "互相", "彼此", "其他", "其它", "某些", "任何",
+            "这个", "那个", "这些", "那些", "这是", "那是",
+            // ─ 疑问词 ─
+            "什么", "怎么", "为什么", "怎么样", "到底", "究竟", "难道",
+            // ─ 数量词 ─
+            "一些", "一下", "一点", "一种", "一次", "一遍", "一场", "一番", "一幕",
+            "很多", "很少", "半部",
+            // ─ 程度副词 ─
+            "非常", "比较", "有点", "特别", "确实", "相对", "一般", "普通",
+            "真的", "简直", "似乎", "果然", "居然", "竟然", "毕竟",
+            // ─ 泛泛评价（过于笼统） ─
+            "好看", "不好", "不错", "还行", "太差", "太好", "说是", "来说",
+            // ─ 介词/连词 ─
+            "因为", "所以", "但是", "可以", "对于", "关于", "由于", "基于",
+            "随着", "等于", "属于", "至于", "如果", "虽然", "不过", "其实",
+            "而且", "然后", "或者", "还是", "不仅", "不但", "何况", "以及",
+            "或是", "要么", "不论", "不管", "无论", "与其", "不如", "以便",
+            "除非", "一旦", "万一", "即便", "哪怕", "即使", "尽管", "并且",
+            // ─ 时间词 ─
+            "时候", "一直", "已经", "后来", "最后", "开始", "出现", "曾经",
+            "以前", "以后", "之前", "之后", "刚刚", "马上", "立刻",
+            "忽然", "突然", "逐渐", "终于",
+            // ─ 助动词/否定 ─
+            "不得", "不到", "不会", "不能", "不要", "不用", "不行", "无关", "无法",
+            // ─ 结构助词/语气词 ─
+            "的话", "似的", "这么", "看的", "的是", "有的", "一样", "有些", "也是",
+            "都是", "不算", "而是", "本来", "原来", "出来", "起来", "下去",
+            "过来", "过去", "回来",
+            // ─ 认知动词（泛义） ─
+            "觉得", "感觉", "认为", "以为", "知道", "明白", "理解", "发现", "看到",
+            // ─ 复合功能短语 ─
             "我觉得", "我感觉", "我认为", "我想说", "说实话", "讲真", "客观说",
             "个人觉", "总体来", "整体来", "综合来", "总结来", "一句话",
+            "只能说", "不知道", "不觉得", "不至于", "完全不", "并不",
+            "并非", "并非是", "并不是", "不算太", "不算很",
+            // ─ 影视评价维度泛称（通用，不作为关键词） ─
+            "剧情", "演技", "画面", "导演", "演员", "故事", "角色", "配乐",
+            "镜头", "表演", "主题", "节奏", "音乐", "观众",
+            // ─ 方位/处所词 ─
+            "地方", "东西", "当中", "其中", "以上", "以下", "以外", "以内",
+            // ─ 情态词 ─
+            "可能", "应该", "也许", "或许",
+            // ─ 看过/看了相关 ─
+            "看了", "看完", "看过", "看着",
+            "看了一", "看了两", "看了三", "看完这", "看完那",
+            // ─ 观影相关短语 ─
             "演技在", "画面在", "剧情在", "节奏在", "配乐在", "主题在",
             "第一遍", "第二次", "第一次", "一开始", "第一眼",
             "整个电", "整个故", "整部片", "整部电",
-            "且不", "而且不", "但也不", "可是不", "却不", "却没"
+            "且不", "而且不", "但也不", "可是不", "却不", "却没",
+            // ─ 其他高频功能词 ─
+            "就是", "没有", "不是", "还有", "这样", "那样"
     ));
 
     /**
@@ -357,6 +390,19 @@ public class AnalysisService {
             }
         }
 
+        // ── 复合词加权：4字短语若由两个有意义的2字词组成，则提升50%权重 ──
+        for (String word : new ArrayList<>(freq.keySet())) {
+            if (word.length() == 4) {
+                String first2 = word.substring(0, 2);
+                String last2 = word.substring(2, 4);
+                if (freq.containsKey(first2) && freq.containsKey(last2)
+                        && !isGenericKeyword(first2) && !isGenericKeyword(last2)) {
+                    freq.merge(word, freq.get(word) * 0.5, Double::sum);
+                }
+            }
+        }
+
+        // ── 排序：先按频率降序，再按词长降序 ──
         List<Map.Entry<String, Double>> ranked = new ArrayList<>(freq.entrySet());
         ranked.removeIf(e -> e.getValue() < 1.5);
         ranked.sort((a, b) -> {
@@ -364,6 +410,17 @@ public class AnalysisService {
             return byCount != 0 ? byCount : Integer.compare(b.getKey().length(), a.getKey().length());
         });
 
+        // ── 自适应门槛：不足30个时降低到1.0重新提取 ──
+        if (ranked.size() < 30) {
+            ranked = new ArrayList<>(freq.entrySet());
+            ranked.removeIf(e -> e.getValue() < 1.0);
+            ranked.sort((a, b) -> {
+                int byCount = Double.compare(b.getValue(), a.getValue());
+                return byCount != 0 ? byCount : Integer.compare(b.getKey().length(), a.getKey().length());
+            });
+        }
+
+        // ── 去重：仅当词长差<2且互为子串时才去重，避免长词吞掉短词 ──
         List<Object[]> keywords = new ArrayList<>();
         for (Map.Entry<String, Double> entry : ranked) {
             if (keywords.size() >= 30) break;
@@ -371,17 +428,38 @@ public class AnalysisService {
             boolean duplicate = false;
             for (Object[] item : keywords) {
                 String existing = String.valueOf(item[0]);
-                if (existing.contains(word) || word.contains(existing)) {
+                int lenDiff = Math.abs(existing.length() - word.length());
+                if (lenDiff < 2 && (existing.contains(word) || word.contains(existing))) {
                     duplicate = true;
                     break;
                 }
             }
             if (!duplicate) keywords.add(new Object[]{word, Math.max(1, (int) Math.round(entry.getValue()))});
         }
+
+        // ── 兜底：空结果时从评论中取高频2字词 ──
         if (keywords.isEmpty()) {
-            keywords.add(new Object[]{"核心段落", 3});
-            keywords.add(new Object[]{"情绪余味", 2});
-            keywords.add(new Object[]{"人物动机", 2});
+            Map<String, Integer> twoCharFreq = new HashMap<>();
+            for (Comment c : comments) {
+                String text = c.getText() == null ? "" : c.getText().replaceAll("[^\\u4e00-\\u9fa5]", " ");
+                Matcher m = Pattern.compile("[\\u4e00-\\u9fa5]{2}").matcher(text);
+                while (m.find()) {
+                    String w = m.group();
+                    if (!isGenericKeyword(w)) {
+                        twoCharFreq.merge(w, 1, Integer::sum);
+                    }
+                }
+            }
+            List<Map.Entry<String, Integer>> sorted = new ArrayList<>(twoCharFreq.entrySet());
+            sorted.sort((a, b) -> b.getValue() - a.getValue());
+            for (Map.Entry<String, Integer> e : sorted) {
+                if (keywords.size() >= 10) break;
+                keywords.add(new Object[]{e.getKey(), Math.max(1, e.getValue())});
+            }
+            if (keywords.isEmpty()) {
+                keywords.add(new Object[]{"观影体验", 3});
+                keywords.add(new Object[]{"情感表达", 2});
+            }
         }
         return keywords;
     }
@@ -439,14 +517,14 @@ public class AnalysisService {
 
     // ─── 方面级情感分析 ───
     private static final String[][] ASPECT_PATTERNS = {
-        {"剧情", "故事|情节|叙事|剧本|线索|伏笔|反转|逻辑|设定|桥段|套路|剧情|开头|铺垫|前半|后半|世界观|设定|梗|虐心|催泪|狗血|俗套"},
-        {"演技", "演技|表演|演员|角色|饰演|演绎|主角|配角|群像|表演力|刻画|塑造|眼神|微表情|出戏|入戏|台词功|演技在线|演得好|演得"},
-        {"视听", "画面|镜头|摄影|视效|特效|色彩|构图|光影|视觉|画面感|大片感|视觉冲击|美学|质感|帧|截图|名场面|视觉盛宴"},
-        {"节奏", "节奏|拖沓|紧凑|缓慢|快|慢|剪辑|转折|推进|松散|冗长|注水|拖戏|拖拉|太长|太慢|太快|高能|停不下来|一气呵成"},
-        {"主题", "主题|思想|深度|内涵|隐喻|象征|哲学|意义|表达|探讨|女性|男权|社会|现实|阶层|批判|反思|启示|价值观|立场"},
-        {"配乐", "配乐|音乐|音效|BGM|主题曲|背景音|原声|OST|配乐感|音乐性|配乐好|音乐响|BGM太"},
-        {"美术", "美术|布景|服装|道具|场景|美术设计|造型|服化道|审美|服化|妆造|美术风格|置景|年代感|服化精美"},
-        {"结尾", "结尾|结局|最后|收尾|尾声|终章|收场|落幕|结局|结尾好|结尾烂|HE|BE|开放式"}
+        {"剧情", "故事|情节|叙事|剧本|线索|伏笔|反转|逻辑|设定|桥段|套路|剧情|开头|铺垫|前半|后半|世界观|人设|动机|结局走向|梗|虐心|催泪|狗血|俗套|脉络|骨架|人物弧|起承转合|悬念|暗线|明线|支线|主线|剧情线|叙事节奏|叙事结构|叙事方式|故事性|故事内核|故事走向|情节推动|转折点|高潮|波折|跌宕|信息量|叙事密度|剧本扎实|剧本薄弱|剧本硬伤|剧本漏洞|剧本逻辑|剧本结构|剧本完成度|剧情流畅|剧情紧凑|剧情松散|剧情推进|剧情发展|剧情走向|剧情转折|剧情反转|剧情高潮|剧情起伏|弧光"},
+        {"演技", "演技|表演|演员|角色|饰演|演绎|主角|配角|群像|表演力|刻画|塑造|眼神|微表情|出戏|入戏|台词功|台词功底|演技在线|演得好|演得|代入感|感染力|表演层次|情绪递进|共情|信念感|撑起|扛住|演技炸裂|演技派|实力派|老戏骨|面瘫|油腻|用力过猛|表演痕迹|浮夸|做作|呆板|灵动|传神|到位|精准|拿捏|分寸感|张力|爆发力|控制力|表现力|角色贴合|人戏合一|角色塑造|人物刻画|人物塑造|形象立体|形象饱满|有血有肉|演活了|演技碾压|演技吊打"},
+        {"视听", "画面|镜头|摄影|视效|特效|色彩|构图|光影|视觉|画面感|大片感|视觉冲击|美学|质感|帧|截图|名场面|视觉盛宴|镜头美学|色彩美学|光影美学|每一帧|壁纸级|绝美画面|视觉体验|视觉享受|视觉奇观|画面精致|画面考究|画面细腻|画面质感|画面唯美|画面大气|调色|滤镜|色调|景深|慢镜头|长镜头|特写|远景|全景|构图精妙|运镜|机位|取景|布光|打光|画面构图|镜头调度|镜头语言|画面语言|视觉语言|影像语言|电影感|大片质感|画面冲击力|视觉表现力|画面表现力|画面张力|画面感染力|画面沉浸感|画面代入感"},
+        {"节奏", "节奏|拖沓|紧凑|缓慢|快|慢|剪辑|转折|推进|松散|冗长|注水|拖戏|拖拉|太长|太慢|太快|高能|停不下来|一气呵成|节奏感|节奏控制|张弛有度|行云流水|丝滑|顺畅|流畅|割裂|突兀|拖泥带水|磨叽|注水剧|水剧|水分|凑数|拖时长|精简|利落|一口气|追剧|熬夜|欲罢不能|沉浸|节奏明快|节奏流畅|节奏紧凑|节奏松散|节奏拖沓|节奏混乱|节奏失调|收放自如|松紧有度|干脆|凝练|节奏拉满|全程高能|全程无尿点|紧凑感|松弛感|节奏断裂|节奏跳跃"},
+        {"主题", "主题|思想|深度|内涵|隐喻|象征|哲学|意义|表达|探讨|女性|男权|社会|现实|阶层|批判|反思|启示|价值观|立场|议题|社会议题|现实议题|人文关怀|人性|人伦|伦理|道德|救赎|善恶|正义|公平|自由|平等|抗争|反抗|觉醒|女性觉醒|女性意识|父权|阶层固化|阶级|贫富|城乡|文化冲突|代际|移民|弱势群体|边缘|歧视|偏见|刻板印象|身份认同|家国情怀|民族|时代缩影|寓言|讽刺|荒诞|黑色幽默|悲悯|终极关怀|存在主义|异化|体制|规则|丛林法则|文明|野蛮|思想性|思想深度|思想内核|主题表达|主题深度|主题内核|社会批判|现实批判|社会反思|现实反思|人文思考|哲学思考"},
+        {"配乐", "配乐|音乐|音效|BGM|主题曲|背景音|原声|OST|配乐感|音乐性|旋律|曲调|编曲|作曲|交响|弦乐|钢琴|鼓点|和声|片尾曲|插曲|片头曲|背景音乐|声音设计|声效|环境音|混音|声场|环绕|立体声|杜比|听觉体验|音乐品味|音乐张力|音乐情绪|音乐感染力|音乐烘托|音乐渲染|音乐铺垫|音乐高潮|音乐留白|静默|配乐大师|配乐绝|配乐封神|配乐拉胯|配乐出戏|配乐违和|配乐加分|配乐减分|音乐响起|BGM响起|配乐到位|配乐精准|配乐出色"},
+        {"美术", "美术|布景|服装|道具|场景|美术设计|造型|服化道|审美|服化|妆造|美术风格|置景|年代感|服化精美|美术指导|场景设计|场景搭建|场景布置|场景氛围|场景质感|场景细节|场景还原|场景沉浸|场景真实|场景考究|场景精致|服装设计|服装造型|服装质感|道具设计|道具制作|道具质感|化妆|妆容|特效化妆|造型设计|实景|棚拍|外景|内景|年代还原|年代质感|服化道精美|服化道考究|美术质感|美术审美|美术水准|美术完成度|视觉风格|美术品位"},
+        {"结尾", "结尾|结局|最后|收尾|尾声|终章|收场|落幕|结局走向|结尾好|结尾烂|HE|BE|开放式|开放式结局|圆满|意难平|烂尾|神结尾|反转结局|意料之外|情理之中|首尾呼应|闭环|留白|余味|回味|意犹未尽|戛然而止|仓促|草率|虎头蛇尾|画蛇添足|狗尾续貂|画龙点睛|升华|收束|终结|余韵|耐人寻味|引人深思|发人深省|结尾反转|结局反转|结局圆满|结局遗憾|结局仓促|结尾升华|结尾点睛|结尾留白|结尾余味|结尾回味|结尾意犹未尽"}
     };
     private static final Pattern STRONG_POSITIVE = Pattern.compile("封神|绝了|震撼|神作|标杆|教科书|天花板|无可挑剔|完美|杰作| masterpiece |大师|天花板|封顶|绝赞|叹为观止");
     private static final Pattern STRONG_NEGATIVE = Pattern.compile("崩坏|败笔|烂尾|灾难|一塌糊涂|惨不忍睹|狗屁|垃圾|烂片|圾|拉胯|稀烂|车祸|魔幻|离谱|恶心");
@@ -461,6 +539,23 @@ public class AnalysisService {
         if (STRONG_NEGATIVE.matcher(text).find()) base -= 2.0;
         if (MODERATE_POSITIVE.matcher(text).find()) base += 0.8;
         if (MODERATE_NEGATIVE.matcher(text).find()) base -= 0.8;
+
+        // 情感词数量的影响：更多情感词→更极端的polarity
+        int posCount = countMatches(text, POSITIVE_WORDS);
+        int negCount = countMatches(text, NEGATIVE_WORDS);
+        base += (posCount - negCount) * 0.3;
+
+        // 评论长度的影响：长评论polarity更极端
+        int textLen = text.length();
+        if (textLen > 50) base += base > 0 ? 0.3 : (base < 0 ? -0.3 : 0);
+        if (textLen > 100) base += base > 0 ? 0.2 : (base < 0 ? -0.2 : 0);
+
+        // 否定词的处理："不好"vs"好"应区分
+        int negationCount = countMatches(text, "不|没|未|别|勿|莫|无|非");
+        if (negationCount > 0 && posCount > negCount) {
+            base -= negationCount * 0.15;
+        }
+
         return Math.max(-5.0, Math.min(5.0, Math.round(base * 10) / 10.0));
     }
 
@@ -469,8 +564,20 @@ public class AnalysisService {
         int count = 0;
         if (STRONG_POSITIVE.matcher(text).find()) count += 2;
         if (STRONG_NEGATIVE.matcher(text).find()) count += 2;
-        count += countMatches(text, "震撼|封神|绝|崩|烂|败|哭|泪|破防|窒息|压抑|愤怒|爽|燃");
-        double intensity = 1.0 + count * 0.6;
+
+        // 具体情绪词的权重区分（"封神"权重高于"好看"）
+        count += countMatches(text, "封神|绝了|神作|天花板|教科书|无可挑剔|崩坏|败笔|烂尾|灾难|一塌糊涂|惨不忍睹|垃圾|拉胯|稀烂") * 2;
+        count += countMatches(text, "震撼|绝|崩|烂|败|哭|泪|破防|窒息|压抑|愤怒|爽|燃|惊艳|泪目");
+
+        // 评论长度的加权（长评论通常情绪更投入）
+        int textLen = text.length();
+        double lenBonus = Math.min(1.5, textLen / 100.0);
+
+        // 标点符号（感叹号、问号多=情绪强烈）
+        int punctCount = countMatches(text, "！|!|？|?");
+        double punctBonus = Math.min(1.5, punctCount * 0.4);
+
+        double intensity = 1.0 + count * 0.6 + lenBonus + punctBonus;
         return Math.max(0.5, Math.min(5.0, Math.round(intensity * 10) / 10.0));
     }
 
@@ -482,7 +589,7 @@ public class AnalysisService {
 
     // ─── 方面级散点（聚合相似情感评论）───
     // 策略：对每条评论检测提及的方面，计算该方面的polarity和intensity，
-    // 然后将相同方面+相近情感(polarity四舍五入到0.5，intensity四舍五入到0.5)的评论聚合为一个点，
+    // 然后将相同方面+相近情感(polarity四舍五入到0.1，intensity四舍五入到0.1)的评论聚合为一个点，
     // votes = 聚合的评论条数（表示有多少条评论表达了相似情感），点越大代表越多评论持相同看法
     public static List<Map<String, Object>> calculateScatter(List<Comment> comments) {
         Map<String, Map<String, Object>> clusters = new LinkedHashMap<>();
@@ -500,9 +607,9 @@ public class AnalysisService {
 
                 double polarity = calculateAspectPolarity(c, aspect);
                 double intensity = calculateAspectIntensity(c);
-                // 四舍五入到0.5精度，使相似情感的评论聚合
-                double rp = Math.round(polarity * 2) / 2.0;
-                double ri = Math.round(intensity * 2) / 2.0;
+                // 四舍五入到0.1精度，使相似但不同的情感能形成不同的点，增加散点数量
+                double rp = Math.round(polarity * 10) / 10.0;
+                double ri = Math.round(intensity * 10) / 10.0;
                 String key = aspect + "_" + rp + "_" + ri;
 
                 aggregateCluster(clusters, key, aspect, rp, ri, c, text);
@@ -512,8 +619,8 @@ public class AnalysisService {
             if (!anyAspect) {
                 double polarity = calculateAspectPolarity(c, "剧情");
                 double intensity = calculateAspectIntensity(c);
-                double rp = Math.round(polarity * 2) / 2.0;
-                double ri = Math.round(intensity * 2) / 2.0;
+                double rp = Math.round(polarity * 10) / 10.0;
+                double ri = Math.round(intensity * 10) / 10.0;
                 String key = "剧情_" + rp + "_" + ri;
                 aggregateCluster(clusters, key, "剧情", rp, ri, c, text);
             }
