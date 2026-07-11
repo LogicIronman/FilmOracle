@@ -184,22 +184,8 @@ public class AiService {
             // radar
             result.setRadar(extractObjectArrayList(aiResult, "radar"));
 
-            // scatter — AI返回太少时回退到本地聚合引擎
-            List<Map<String, Object>> scatter = extractScatterList(aiResult);
-            if (scatter == null || scatter.size() < 15) {
-                System.out.println("[AI] Scatter too few (" + (scatter != null ? scatter.size() : 0) + "), using local engine aggregation");
-                scatter = AnalysisService.calculateScatter(comments);
-            }
-            result.setScatter(scatter);
-
-            // emotionMap — AI未返回或散点已替换时用本地引擎
-            Map<String, Object> emotionMap = (Map<String, Object>) aiResult.get("emotionMap");
-            if (emotionMap == null) {
-                emotionMap = AnalysisService.calculateEmotionMap(comments);
-            }
-            if (emotionMap != null) {
-                result.setEmotionMap(emotionMap);
-            }
+            // 情绪图必须与本次完整评论逐条对应，不采用AI生成的数量或聚类权重。
+            applyDeterministicEmotionCharts(result, comments);
 
             // sentimentDistribution
             Map<String, Object> sd = (Map<String, Object>) aiResult.get("sentimentDistribution");
@@ -239,6 +225,14 @@ public class AiService {
             System.err.println("[AI ERROR] " + e.getMessage());
             return null;
         }
+    }
+
+    /** 使用本地确定性统计覆盖AI可能生成的不一致散点和象限数据。 */
+    public static void applyDeterministicEmotionCharts(AnalysisResult result, List<Comment> comments) {
+        if (result == null) return;
+        List<Comment> safeComments = comments == null ? List.of() : comments;
+        result.setScatter(AnalysisService.calculateScatter(safeComments));
+        result.setEmotionMap(AnalysisService.calculateEmotionMap(safeComments));
     }
 
     /**

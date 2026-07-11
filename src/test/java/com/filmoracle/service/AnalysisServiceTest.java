@@ -158,6 +158,21 @@ class AnalysisServiceTest {
         assertEquals("中性", details.getFirst().get("sentiment"));
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void emotionQuadrantCountsUseOneVotePerComment() {
+        List<Comment> comments = List.of(
+                comment("multi-aspect-positive", "剧情紧凑，表演自然，画面和配乐都很精彩。", 5),
+                comment("multi-aspect-negative", "剧情混乱，表演尴尬，画面糟糕，配乐也很差。", 1)
+        );
+
+        Map<String, Object> emotionMap = AnalysisService.calculateEmotionMap(comments);
+        List<Map<String, Object>> quadrants = (List<Map<String, Object>>) emotionMap.get("quadrants");
+        int total = quadrants.stream().mapToInt(q -> ((Number) q.get("count")).intValue()).sum();
+
+        assertEquals(comments.size(), total);
+    }
+
     private Comment comment(String id, String text, int rating) {
         Comment comment = new Comment();
         comment.setId(id);

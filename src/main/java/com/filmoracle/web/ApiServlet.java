@@ -441,6 +441,9 @@ public class ApiServlet extends HttpServlet {
                     engine = "rule-based";
                 }
 
+                // 缓存中的旧AI结果也必须按本次完整评论重新生成情绪散点和四象限。
+                AiService.applyDeterministicEmotionCharts(analysis, analysisComments);
+
                 // 复用现有分析链路，同时把页面已获取的评论批量写入评论管理库。
                 applyAnalyzedLabels(allComments, analysis.getAnalyzedComments());
                 Map<String, Object> persistence = CommentService.saveBatch(movie, allComments, "analysis");

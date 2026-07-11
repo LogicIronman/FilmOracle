@@ -309,6 +309,9 @@ let currentSearchResults = [];
 let currentView = "home";
 let activeSentiment = "all";
 const viewHistory = [];
+let taskTimerId = null;
+let taskTimerStartedAt = 0;
+let taskTimerState = "ready";
 
 function $(selector) {
   return document.querySelector(selector);
@@ -637,7 +640,8 @@ function renderPosterRows() {
 }
 
 function setTask(lines, state = "ready") {
-  $("#task-state").textContent = state;
+  taskTimerState = state;
+  $("#task-state").textContent = taskTimerId ? `${state} · ${formatElapsedTime(nowMilliseconds() - taskTimerStartedAt)}` : state;
   $("#task-log").textContent = lines.join("\n");
 }
 
@@ -645,7 +649,50 @@ function appendTask(line, state) {
   const log = $("#task-log");
   log.textContent += `${line}\n`;
   log.scrollTop = log.scrollHeight;
-  if (state) $("#task-state").textContent = state;
+  if (state) taskTimerState = state;
+  const visibleState = state || taskTimerState;
+  $("#task-state").textContent = taskTimerId ? `${visibleState} · ${formatElapsedTime(nowMilliseconds() - taskTimerStartedAt)}` : visibleState;
+}
+
+function nowMilliseconds() {
+  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+}
+
+function formatElapsedTime(milliseconds) {
+  const totalTenths = Math.max(0, Math.floor(Number(milliseconds || 0) / 100));
+  const minutes = Math.floor(totalTenths / 600);
+  const seconds = Math.floor((totalTenths % 600) / 10);
+  const tenths = totalTenths % 10;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
+}
+
+function resetTaskTimer() {
+  if (taskTimerId) clearInterval(taskTimerId);
+  taskTimerId = null;
+  taskTimerStartedAt = 0;
+}
+
+function startTaskTimer(label = "running") {
+  resetTaskTimer();
+  taskTimerState = label;
+  taskTimerStartedAt = nowMilliseconds();
+  const update = () => {
+    const state = $("#task-state");
+    if (state) state.textContent = `${taskTimerState} · ${formatElapsedTime(nowMilliseconds() - taskTimerStartedAt)}`;
+  };
+  update();
+  taskTimerId = setInterval(update, 100);
+}
+
+function stopTaskTimer(outcome = "done") {
+  if (!taskTimerStartedAt) return 0;
+  const elapsed = nowMilliseconds() - taskTimerStartedAt;
+  resetTaskTimer();
+  taskTimerState = outcome;
+  appendTask(`> 总耗时: ${(elapsed / 1000).toFixed(1)} 秒`);
+  const state = $("#task-state");
+  if (state) state.textContent = `${outcome} · ${formatElapsedTime(elapsed)}`;
+  return elapsed;
 }
 
 function renderResults(query, movies, meta = {}) {
@@ -1323,31 +1370,13 @@ function renderCharts() {
     return `<text x="${x}" y="${y}" fill="${color}" font-size="11" font-weight="700">${escapeHtml(q.name)} ${q.count}(${q.percent}%)</text>`;
   }).join("");
 
-  // 方面级散点（点大小用sqrt缩放，votes=聚合评论数）
-  // 当所有votes都≤1时，前端根据评论数据计算每个aspect被提及的频率作为替代的size权重
-  const allVotesSmall = scatterData.length > 0 && scatterData.every(p => (p.votes || 0) <= 1);
-  let aspectFreq = {};
-  if (allVotesSmall && currentComments.length > 0) {
-    for (const comment of currentComments) {
-      const text = comment.text || "";
-      if (!text) continue;
-      for (const [aspect, regex] of Object.entries(ASPECT_REGEX)) {
-        if (regex.test(text)) {
-          aspectFreq[aspect] = (aspectFreq[aspect] || 0) + 1;
-        }
-      }
-    }
-  }
+  // 方面级散点（点大小用sqrt缩放，votes=该聚类的真实评论数）
   const points = scatterData.map((point, idx) => {
     const cx = polToX(point.polarity || 0);
     const cy = intToY(point.intensity || 0);
     const aspect = point.aspect || "剧情";
     const fill = aspectColors[aspect] || "#908f8b";
-    let votes = point.votes || 1;
-    // 当所有votes都≤1时，用aspect频率作为替代的size权重
-    if (allVotesSmall && aspectFreq[aspect]) {
-      votes = aspectFreq[aspect];
-    }
+    const votes = Math.max(1, Number(point.votes || 1));
     // sqrt缩放：votes=1→r≈11, votes=5→r≈17, votes=10→r≈22, votes=20→r≈28
     const r = Math.max(8, Math.min(28, 6 + Math.sqrt(votes) * 5));
     const opacity = Math.max(0.55, Math.min(0.9, 0.55 + votes * 0.025));
@@ -1453,32 +1482,7 @@ function renderReview() {
     tagEl.textContent = isAi ? "AI评析" : "本地评析";
     tagEl.className = isAi ? "status-tag running" : "status-tag neutral";
 
-    // 检查是否为对象格式（新版AI返回）
-    if (typeof review === "object" && review.fullText) {
-      const highlights = Array.isArray(review.highlightPoints) ? review.highlightPoints : [];
-      const weaknesses = Array.isArray(review.weaknesses) ? review.weaknesses : [];
-      reviewEl.innerHTML = `
-        ${review.overallReception ? `<p style="font-weight:700;color:var(--accent-active);margin-bottom:10px;">${escapeHtml(review.overallReception)}</p>` : ""}
-        ${highlights.length ? `<p style="margin:8px 0;"><strong style="color:var(--positive);">出彩：</strong>${highlights.map(h => escapeHtml(h)).join("；")}</p>` : ""}
-        ${weaknesses.length ? `<p style="margin:8px 0;"><strong style="color:var(--negative);">不足：</strong>${weaknesses.map(w => escapeHtml(w)).join("；")}</p>` : ""}
-        ${review.finalJudgement ? `<p style="margin:8px 0;font-style:italic;color:var(--muted);">${escapeHtml(review.finalJudgement)}</p>` : ""}
-        <p style="margin-top:12px;text-indent:2em;line-height:1.8;">${escapeHtml(review.fullText)}</p>
-      `;
-    } else if (typeof review === "string") {
-      // 旧格式（字符串）或规则引擎生成
-      try {
-        const parsed = JSON.parse(review);
-        if (parsed && parsed.fullText) {
-          renderReviewObject(parsed, reviewEl);
-        } else {
-          reviewEl.innerHTML = `<p>${escapeHtml(review)}</p>`;
-        }
-      } catch {
-        reviewEl.innerHTML = `<p>${escapeHtml(review)}</p>`;
-      }
-    } else {
-      reviewEl.innerHTML = `<p class="muted">评析格式异常。</p>`;
-    }
+    reviewEl.innerHTML = formatReviewHtml(review);
   } else {
     reviewEl.innerHTML = `<p class="muted">点击「获取并 AI 分析」后，此处将显示基于评论数据的客观评析。</p>`;
     tagEl.textContent = "待生成";
@@ -1487,15 +1491,7 @@ function renderReview() {
 }
 
 function renderReviewObject(review, el) {
-  const highlights = Array.isArray(review.highlightPoints) ? review.highlightPoints : [];
-  const weaknesses = Array.isArray(review.weaknesses) ? review.weaknesses : [];
-  el.innerHTML = `
-    ${review.overallReception ? `<p style="font-weight:700;color:var(--accent-active);margin-bottom:10px;">${escapeHtml(review.overallReception)}</p>` : ""}
-    ${highlights.length ? `<p style="margin:8px 0;"><strong style="color:var(--positive);">出彩：</strong>${highlights.map(h => escapeHtml(h)).join("；")}</p>` : ""}
-    ${weaknesses.length ? `<p style="margin:8px 0;"><strong style="color:var(--negative);">不足：</strong>${weaknesses.map(w => escapeHtml(w)).join("；")}</p>` : ""}
-    ${review.finalJudgement ? `<p style="margin:8px 0;font-style:italic;color:var(--muted);">${escapeHtml(review.finalJudgement)}</p>` : ""}
-    <p style="margin-top:12px;text-indent:2em;line-height:1.8;">${escapeHtml(review.fullText)}</p>
-  `;
+  el.innerHTML = formatReviewHtml(review);
 }
 
 function renderComments() {
@@ -1604,7 +1600,7 @@ function exportPdfReport() {
   const keywordHtml = $("#keyword-cloud").innerHTML;
   const ratingHtml = $("#rating-bars").innerHTML;
   const comparisonHtml = $("#comparison-bars").innerHTML;
-  const reviewText = currentAnalysis.review || "暂无评析";
+  const reviewHtml = formatReviewHtml(currentAnalysis.review);
   const topComments = currentComments.slice(0, 10).map((c, i) =>
     `<div class="comment"><span class="star">${c.star || ""}</span><span class="sentiment ${c.sentiment || ""}">${c.sentiment || ""}</span><p>${escapeHtml(c.text || "")}</p><span class="user">— ${escapeHtml(c.user || "豆瓣用户")}</span></div>`
   ).join("");
@@ -1650,7 +1646,7 @@ function exportPdfReport() {
   <h2>同类型对比</h2>
   <div class="section">${comparisonHtml}</div>
   <h2>综合评析</h2>
-  <div class="review">${escapeHtml(reviewText)}</div>
+  <div class="review">${reviewHtml}</div>
   <h2>代表评论（前10条）</h2>
   ${topComments || "<p>暂无评论数据</p>"}
   <p style="text-align:center;color:#908f8b;margin-top:24px;">Generated by FilmOracle — AI Movie Review Intelligence</p>
@@ -1718,6 +1714,7 @@ async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false
   }
   const settings = getSettings();
   const commentCount = settings.commentCount || 100;
+  startTaskTimer(runAnalysis ? "AI 分析中" : "本地分析中");
 
   // ─── Step 1: 获取评论 ───
   setTask([
@@ -1806,6 +1803,7 @@ async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false
   renderReview();
   renderDetail(currentMovie);
   appendTask("> === 任务完成 ===", "done");
+  stopTaskTimer("done");
 }
 
 async function importMovieFromForm(form) {
@@ -1858,6 +1856,29 @@ async function importMovieFromForm(form) {
   }
 }
 
+function formatReviewHtml(review) {
+  if (!review) return `<p class="muted">暂无评析</p>`;
+  let normalized = review;
+  if (typeof normalized === "string") {
+    try {
+      const parsed = JSON.parse(normalized);
+      if (parsed && typeof parsed === "object") normalized = parsed;
+    } catch {
+      return `<p>${escapeHtml(normalized)}</p>`;
+    }
+  }
+  if (!normalized || typeof normalized !== "object") return `<p>${escapeHtml(normalized)}</p>`;
+  const highlights = Array.isArray(normalized.highlightPoints) ? normalized.highlightPoints : [];
+  const weaknesses = Array.isArray(normalized.weaknesses) ? normalized.weaknesses : [];
+  return `
+    ${normalized.overallReception ? `<p style="font-weight:700;color:var(--accent-active);margin-bottom:10px;">${escapeHtml(normalized.overallReception)}</p>` : ""}
+    ${highlights.length ? `<p style="margin:8px 0;"><strong style="color:var(--positive);">出彩：</strong>${highlights.map((item) => escapeHtml(item)).join("；")}</p>` : ""}
+    ${weaknesses.length ? `<p style="margin:8px 0;"><strong style="color:var(--negative);">不足：</strong>${weaknesses.map((item) => escapeHtml(item)).join("；")}</p>` : ""}
+    ${normalized.finalJudgement ? `<p style="margin:8px 0;font-style:italic;color:var(--muted);">${escapeHtml(normalized.finalJudgement)}</p>` : ""}
+    ${normalized.fullText ? `<p style="margin-top:12px;text-indent:2em;line-height:1.8;">${escapeHtml(normalized.fullText)}</p>` : ""}
+  `;
+}
+
 async function enrichImportedMovieSummary(movie) {
   if (!movie.title) return movie;
   const search = await apiGet(`/api/search?q=${encodeURIComponent(movie.title)}`, null);
@@ -1887,6 +1908,7 @@ async function analyzeImportedComments(analysisMode) {
     showToast("当前没有可分析的导入评论");
     return;
   }
+  startTaskTimer(analysisMode === "local" ? "本地分析中" : "AI 分析中");
   setTask([
     "> === 导入评论分析 ===",
     `> 电影: ${currentMovie?.title || "未命名电影"}`,
@@ -1899,23 +1921,31 @@ async function analyzeImportedComments(analysisMode) {
     appendTask(`> 本地规则分析完成: ${currentComments.length} 条导入评论`, "analysis ready");
     renderDetail(currentMovie);
     appendTask("> === 分析完成 ===", "done");
+    stopTaskTimer("done");
     return;
   }
 
-  appendTask(`> 正在将 ${currentComments.length} 条导入评论发送 AI 分析...`, "ai analysis");
-  const response = await fetch("/api/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ movie: currentMovie, comments: currentComments })
-  });
-  const data = await response.json();
-  if (!response.ok || !data.ok || !data.analysis) throw new Error(data.error || "AI 分析失败");
-  currentAnalysis = normalizeAnalysis(data.analysis);
-  currentComments = applyAnalysisToComments(data.comments || currentComments, currentAnalysis);
-  appendTask(`> AI 分析完成: ${data.meta?.engine || "AI"}`, "analysis ready");
-  if (data.meta?.cacheHit) appendTask("> 已恢复数据库缓存结果，未重复调用 AI");
-  renderDetail(currentMovie);
-  appendTask("> === 分析完成 ===", "done");
+  try {
+    appendTask(`> 正在将 ${currentComments.length} 条导入评论发送 AI 分析...`, "ai analysis");
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ movie: currentMovie, comments: currentComments })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok || !data.analysis) throw new Error(data.error || "AI 分析失败");
+    currentAnalysis = normalizeAnalysis(data.analysis);
+    currentComments = applyAnalysisToComments(data.comments || currentComments, currentAnalysis);
+    appendTask(`> AI 分析完成: ${data.meta?.engine || "AI"}`, "analysis ready");
+    if (data.meta?.cacheHit) appendTask("> 已恢复数据库缓存结果，未重复调用 AI");
+    renderDetail(currentMovie);
+    appendTask("> === 分析完成 ===", "done");
+    stopTaskTimer("done");
+  } catch (error) {
+    appendTask(`> AI 分析失败: ${error.message}`, "failed");
+    stopTaskTimer("failed");
+    showToast(`AI 分析失败: ${error.message}`);
+  }
 }
 
 // 解析评论文件（CSV/TXT）

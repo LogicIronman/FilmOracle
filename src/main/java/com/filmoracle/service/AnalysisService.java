@@ -710,8 +710,8 @@ public class AnalysisService {
         }
     }
 
-    // ─── 情绪分布图（新四象限，加权统计）───
-    // 使用散点聚合数据，按 votes（聚合评论数）加权统计象限，使统计结果反映真实评论分布
+    // ─── 情绪分布图（新四象限）───
+    // 象限按评论粒度统计：每条评论只计入一次，避免一条多方面评论被重复计数。
     public static Map<String, Object> calculateEmotionMap(List<Comment> comments) {
         Map<String, Object> emotionMap = new LinkedHashMap<>();
         Map<String, String> axis = new LinkedHashMap<>();
@@ -719,22 +719,21 @@ public class AnalysisService {
         axis.put("y", "平淡 → intensity → 强烈");
         emotionMap.put("axis", axis);
 
-        // 用散点数据统计象限（按votes加权）
-        List<Map<String, Object>> scatter = calculateScatter(comments);
+        List<Comment> safeComments = comments == null ? List.of() : comments;
+        List<Map<String, Object>> scatter = calculateScatter(safeComments);
         int totalWeight = 0;
         int rt = 0, lt = 0, lb = 0, rb = 0;
         double sumX = 0, sumY = 0;
-        for (Map<String, Object> pt : scatter) {
-            double pol = Number(pt.get("polarity"));
-            double inten = Number(pt.get("intensity"));
-            int weight = ((Number) pt.getOrDefault("votes", 1)).intValue();
-            totalWeight += weight;
-            sumX += pol * weight;
-            sumY += inten * weight;
-            if (pol >= 0 && inten >= 2.5) rt += weight;
-            else if (pol < 0 && inten >= 2.5) lt += weight;
-            else if (pol < 0 && inten < 2.5) lb += weight;
-            else rb += weight;
+        for (Comment comment : safeComments) {
+            double pol = calculateAspectPolarity(comment, "整体");
+            double inten = calculateAspectIntensity(comment);
+            totalWeight++;
+            sumX += pol;
+            sumY += inten;
+            if (pol >= 0 && inten >= 2.5) rt++;
+            else if (pol < 0 && inten >= 2.5) lt++;
+            else if (pol < 0) lb++;
+            else rb++;
         }
         if (totalWeight == 0) totalWeight = 1;
 
