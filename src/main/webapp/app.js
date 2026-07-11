@@ -694,6 +694,9 @@ function ratingBarsHtml(rows = currentAnalysis.ratingDistribution) {
 }
 
 function renderDetail(movie = currentMovie) {
+  const imported = movie?.source === "导入评论文件";
+  $("#fetch-comments").textContent = imported ? "本地分析" : "获取评论并本地规则分析";
+  $("#fetch-analyze").textContent = imported ? "AI 分析" : "获取并 AI 分析";
   if (!movie) {
     $("#detail-heading").textContent = "电影详情分析";
     $("#detail-poster").innerHTML = `<span>等待选择电影</span>`;
@@ -1805,7 +1808,7 @@ async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false
   appendTask("> === 任务完成 ===", "done");
 }
 
-async function importMovieFromForm(form, analysisMode = "local") {
+async function importMovieFromForm(form) {
   if (!requireAuth()) return;
   const formData = new FormData(form);
   const title = (formData.get("title") || "").trim();
@@ -1842,15 +1845,13 @@ async function importMovieFromForm(form, analysisMode = "local") {
     }
     currentMovie = { ...importedMovie, ...(data.movie || {}), source: "导入评论文件" };
     currentComments = data.comments;
+    currentAnalysis = emptyAnalysis();
     appendTask(`> 已解析并保存 ${currentComments.length} 条导入评论`, "import ready");
-    await analyzeImportedComments(analysisMode);
     renderDetail(currentMovie);
-    renderCharts();
-    renderComments();
-    renderReview();
     showView("detail");
-    appendTask("> === 导入分析完成 ===", "done");
-    showToast(`已使用导入文件中的 ${currentComments.length} 条评论完成分析`);
+    appendTask("> 图表已恢复初始状态，请选择「本地分析」或「AI 分析」", "import ready");
+    appendTask("> === 导入完成 ===", "done");
+    showToast(`已导入 ${currentComments.length} 条评论`);
   } catch (error) {
     appendTask(`> 导入失败: ${error.message}`, "import failed");
     showToast(`导入失败：${error.message}`);
@@ -1882,11 +1883,22 @@ async function enrichImportedMovieSummary(movie) {
 }
 
 async function analyzeImportedComments(analysisMode) {
+  if (!currentComments.length) {
+    showToast("当前没有可分析的导入评论");
+    return;
+  }
+  setTask([
+    "> === 导入评论分析 ===",
+    `> 电影: ${currentMovie?.title || "未命名电影"}`,
+    `> 评论来源: 已导入文件（${currentComments.length} 条）`
+  ], analysisMode === "local" ? "local analysis" : "ai analysis");
   if (analysisMode === "local") {
     appendTask(`> 正在对 ${currentComments.length} 条导入评论执行本地规则分析...`, "local analysis");
     currentAnalysis = buildAnalysis(currentComments, currentMovie);
     currentComments = applyAnalysisToComments(currentComments, currentAnalysis);
     appendTask(`> 本地规则分析完成: ${currentComments.length} 条导入评论`, "analysis ready");
+    renderDetail(currentMovie);
+    appendTask("> === 分析完成 ===", "done");
     return;
   }
 
@@ -1902,6 +1914,8 @@ async function analyzeImportedComments(analysisMode) {
   currentComments = applyAnalysisToComments(data.comments || currentComments, currentAnalysis);
   appendTask(`> AI 分析完成: ${data.meta?.engine || "AI"}`, "analysis ready");
   if (data.meta?.cacheHit) appendTask("> 已恢复数据库缓存结果，未重复调用 AI");
+  renderDetail(currentMovie);
+  appendTask("> === 分析完成 ===", "done");
 }
 
 // 解析评论文件（CSV/TXT）
@@ -2008,12 +2022,17 @@ function bindEvents() {
 
   $("#import-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    const mode = event.submitter?.value === "ai" ? "ai" : "local";
-    void importMovieFromForm(event.currentTarget, mode);
+    void importMovieFromForm(event.currentTarget);
   });
 
-  $("#fetch-comments").addEventListener("click", () => void loadCommentsAndAnalyze(false, true));
-  $("#fetch-analyze").addEventListener("click", () => void loadCommentsAndAnalyze(true));
+  $("#fetch-comments").addEventListener("click", () => {
+    if (currentMovie?.source === "导入评论文件") void analyzeImportedComments("local");
+    else void loadCommentsAndAnalyze(false, true);
+  });
+  $("#fetch-analyze").addEventListener("click", () => {
+    if (currentMovie?.source === "导入评论文件") void analyzeImportedComments("ai");
+    else void loadCommentsAndAnalyze(true);
+  });
   $("#export-comments").addEventListener("click", exportComments);
   $("#export-pdf").addEventListener("click", exportPdfReport);
   $("#global-back").addEventListener("click", goBack);
