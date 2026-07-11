@@ -1805,14 +1805,16 @@ async function loadCommentsAndAnalyze(runAnalysis = false, useLocalRules = false
   appendTask("> === 任务完成 ===", "done");
 }
 
-async function importMovieFromForm(form) {
+async function importMovieFromForm(form, analysisMode = "local") {
+  if (!requireAuth()) return;
   const formData = new FormData(form);
   const title = (formData.get("title") || "").trim();
-  if (!title) {
-    showToast("请填写电影名称（必填）");
+  const file = formData.get("file");
+  if (!title || !(file instanceof File) || file.size === 0) {
+    showToast(!title ? "请填写电影名称（必填）" : "请选择 CSV 或 TXT 评论文件");
     return;
   }
-  const importedMovie = {
+  let importedMovie = {
     id: `import-${Date.now()}`,
     title,
     year: formData.get("year") || "",
@@ -1825,50 +1827,81 @@ async function importMovieFromForm(form) {
     summary: formData.get("summary") || "",
     source: formData.get("source") || "导入评论文件"
   };
-  currentMovie = importedMovie;
+  setTask(["> === 导入评论分析 ===", `> 电影: ${title}`, `> 文件: ${file.name}`, "> 正在解析导入评论..."], "importing");
 
-  // 读取并解析上传的评论文件
-  const fileInput = form.querySelector('input[type="file"]');
-  let parsedComments = [];
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-    const file = fileInput.files[0];
-    const text = await file.text();
-    parsedComments = parseCommentFile(text, file.name);
-  }
+  importedMovie = await enrichImportedMovieSummary(importedMovie);
+  formData.set("movieId", importedMovie.id);
+  formData.set("movieTitle", importedMovie.title);
+  formData.set("summary", importedMovie.summary || "");
 
-  if (parsedComments.length === 0) {
-    // 没有评论数据，显示空白图表
-    currentComments = [];
-    currentAnalysis = emptyAnalysis();
-    renderDetail(importedMovie);
+  try {
+    const response = await fetch("/api/comments/import", { method: "POST", body: formData });
+    const data = await response.json();
+    if (!response.ok || !data.ok || !Array.isArray(data.comments) || data.comments.length === 0) {
+      throw new Error(data.error || "文件中没有可解析的评论");
+    }
+    currentMovie = { ...importedMovie, ...(data.movie || {}), source: "导入评论文件" };
+    currentComments = data.comments;
+    appendTask(`> 已解析并保存 ${currentComments.length} 条导入评论`, "import ready");
+    await analyzeImportedComments(analysisMode);
+    renderDetail(currentMovie);
     renderCharts();
     renderComments();
     renderReview();
     showView("detail");
-    setTask([
-      "> import: 表单已提交",
-      `> movie: ${importedMovie.title}`,
-      "> comments: 未检测到评论数据，请上传 CSV/TXT 文件或通过搜索获取评论",
-      "> charts: 等待评论分析后生成"
-    ], "import ready");
-    showToast("未检测到评论文件，请上传 CSV 或 TXT 文件");
-  } else {
-    // 有评论数据，执行规则引擎分析
-    currentComments = parsedComments;
-    currentAnalysis = buildAnalysis(currentComments, importedMovie);
-    renderDetail(importedMovie);
-    renderCharts();
-    renderComments();
-    renderReview();
-    showView("detail");
-    setTask([
-      "> import: 评论文件解析完成",
-      `> movie: ${importedMovie.title}`,
-      `> comments: ${parsedComments.length} 条评论已导入`,
-      `> analysis: 规则引擎分析完成（可点击「获取并AI分析」升级为AI分析）`
-    ], "import ready");
-    showToast(`已导入 ${parsedComments.length} 条评论`);
+    appendTask("> === 导入分析完成 ===", "done");
+    showToast(`已使用导入文件中的 ${currentComments.length} 条评论完成分析`);
+  } catch (error) {
+    appendTask(`> 导入失败: ${error.message}`, "import failed");
+    showToast(`导入失败：${error.message}`);
   }
+}
+
+async function enrichImportedMovieSummary(movie) {
+  if (!movie.title) return movie;
+  const search = await apiGet(`/api/search?q=${encodeURIComponent(movie.title)}`, null);
+  const candidates = Array.isArray(search?.movies) ? search.movies : [];
+  const matched = candidates.find((item) => item.title === movie.title) || candidates[0];
+  if (!matched?.id) return movie;
+  const detail = await apiGet(`/api/movie/${encodeURIComponent(matched.id)}`, null);
+  const remote = detail?.movie;
+  if (!remote) return movie;
+  return {
+    ...movie,
+    id: remote.id || matched.id || movie.id,
+    year: movie.year || remote.year || "",
+    director: movie.director || remote.director || "",
+    cast: movie.cast || remote.cast || "",
+    genre: movie.genre || remote.genre || "",
+    region: movie.region || remote.region || "",
+    language: movie.language || remote.language || "",
+    duration: movie.duration || remote.duration || "",
+    summary: movie.summary || remote.summary || "",
+    posterUrl: remote.posterUrl || matched.posterUrl || ""
+  };
+}
+
+async function analyzeImportedComments(analysisMode) {
+  if (analysisMode === "local") {
+    appendTask(`> 正在对 ${currentComments.length} 条导入评论执行本地规则分析...`, "local analysis");
+    currentAnalysis = buildAnalysis(currentComments, currentMovie);
+    currentComments = applyAnalysisToComments(currentComments, currentAnalysis);
+    appendTask(`> 本地规则分析完成: ${currentComments.length} 条导入评论`, "analysis ready");
+    return;
+  }
+
+  appendTask(`> 正在将 ${currentComments.length} 条导入评论发送 AI 分析...`, "ai analysis");
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ movie: currentMovie, comments: currentComments })
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok || !data.analysis) throw new Error(data.error || "AI 分析失败");
+  currentAnalysis = normalizeAnalysis(data.analysis);
+  currentComments = applyAnalysisToComments(data.comments || currentComments, currentAnalysis);
+  appendTask(`> AI 分析完成: ${data.meta?.engine || "AI"}`, "analysis ready");
+  if (data.meta?.cacheHit) appendTask("> 已恢复数据库缓存结果，未重复调用 AI");
 }
 
 // 解析评论文件（CSV/TXT）
@@ -1975,7 +2008,8 @@ function bindEvents() {
 
   $("#import-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    importMovieFromForm(event.currentTarget);
+    const mode = event.submitter?.value === "ai" ? "ai" : "local";
+    void importMovieFromForm(event.currentTarget, mode);
   });
 
   $("#fetch-comments").addEventListener("click", () => void loadCommentsAndAnalyze(false, true));

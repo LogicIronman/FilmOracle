@@ -264,10 +264,19 @@ public class ApiServlet extends HttpServlet {
                 movie.setTitle(req.getParameter("movieTitle"));
                 movie.setYear(valueOr(req.getParameter("year"), ""));
                 movie.setGenre(valueOr(req.getParameter("genre"), ""));
+                movie.setDirector(valueOr(req.getParameter("director"), ""));
+                movie.setCast(valueOr(req.getParameter("cast"), ""));
+                movie.setRegion(valueOr(req.getParameter("region"), ""));
+                movie.setLanguage(valueOr(req.getParameter("language"), ""));
+                movie.setDuration(valueOr(req.getParameter("duration"), ""));
+                movie.setSummary(valueOr(req.getParameter("summary"), ""));
+                movie.setSource("导入评论文件");
                 Map<String, Object> result = CommentService.saveBatch(movie, comments, "import");
                 Map<String, Object> response = new LinkedHashMap<>(result);
                 response.put("file", storedFile.getFileName().toString());
                 response.put("parsed", comments.size());
+                response.put("movie", movie);
+                response.put("comments", comments);
                 sendJson(resp, Boolean.TRUE.equals(result.get("ok")) ? 200 : 400, response);
             } catch (Exception e) {
                 sendJson(resp, 500, Map.of("ok", false, "error", "评论文件导入失败: " + e.getMessage()));

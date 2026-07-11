@@ -171,9 +171,12 @@
           <div>
             <button class="text-action" type="button" data-view="home">返回主页</button>
             <p class="eyebrow">导入评论</p>
-            <h2>导入评论并填写来源电影</h2>
+            <h2>导入评论分析</h2>
           </div>
-          <button class="secondary-action" type="button" data-view="settings">设置</button>
+          <div class="head-actions">
+            <button class="secondary-action" type="button" data-view="import-spec">文件规格</button>
+            <button class="secondary-action" type="button" data-view="settings">设置</button>
+          </div>
         </div>
         <form class="import-layout" id="import-form">
           <section class="source-form">
@@ -188,19 +191,45 @@
               <label>语言<input name="language" placeholder="如 英语"></label>
               <label>片长<input name="duration" placeholder="如 169分钟"></label>
               <label class="span-2">来源链接<input name="source" placeholder="https://"></label>
-              <label class="span-2">简介<textarea name="summary" placeholder="电影简介（选填）"></textarea></label>
+              <label class="span-2">简介<textarea name="summary" placeholder="可选；导入时会按电影标题尝试补全，找不到则留空"></textarea></label>
             </div>
           </section>
           <section class="upload-panel">
             <h3>评论文件</h3>
             <label class="upload-box">
-              <input type="file" accept=".csv,.txt">
+              <input type="file" name="file" accept=".csv,.txt" required>
               <span>选择 CSV / TXT</span>
-              <small>CSV需包含评论文本列，TXT每行一条评论。支持行首星级标注如"5星 好看"。</small>
+              <small>仅解析文件内评论。CSV需包含评论文本列；TXT每行一条评论。点击“文件规格”查看示例。</small>
             </label>
-            <button class="primary-action" type="submit">导入并分析</button>
+            <div class="import-actions">
+              <button class="primary-action" type="submit" name="analysisMode" value="local">导入并本地分析</button>
+              <button class="primary-action dark" type="submit" name="analysisMode" value="ai">导入并 AI 分析</button>
+            </div>
           </section>
         </form>
+      </section>
+
+      <section class="view workspace" id="view-import-spec" aria-label="评论文件规格">
+        <div class="workspace-head">
+          <div>
+            <button class="text-action" type="button" data-view="import">返回导入评论</button>
+            <p class="eyebrow">文件规格</p>
+            <h2>评论文件解析说明</h2>
+          </div>
+        </div>
+        <section class="source-form import-spec-panel">
+          <h3>支持格式</h3>
+          <p>仅支持 UTF-8 编码的 <code>.txt</code> 和 <code>.csv</code> 文件。评论文本为必填字段；空行及少于 2 个字符的评论会忽略。</p>
+          <h3>TXT 示例</h3>
+          <pre>5星 角色关系很打动人，结尾余味很强。
+3星 画面不错，但中段节奏略慢。
+1星 人物动机生硬，观感失望。</pre>
+          <h3>CSV 示例</h3>
+          <pre>comment,rating,user
+"角色关系很打动人，结尾余味很强。",5,小林
+"画面不错，但中段节奏略慢。",3,小周</pre>
+          <p class="muted">CSV 评论列可命名为 <code>comment</code>、<code>text</code> 或“评论”；星级和用户列可选。</p>
+        </section>
       </section>
 
       <section class="view workspace" id="view-history" aria-label="历史记录">

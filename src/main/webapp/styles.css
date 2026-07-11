@@ -874,6 +874,35 @@ textarea {
   font-size: 20px;
 }
 
+.import-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.import-actions .primary-action {
+  width: 100%;
+}
+
+.import-spec-panel {
+  max-width: 860px;
+}
+
+.import-spec-panel h3:not(:first-child) {
+  margin-top: 22px;
+}
+
+.import-spec-panel pre {
+  overflow-x: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fffdf9;
+  color: var(--ink);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
 .history-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

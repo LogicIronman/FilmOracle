@@ -223,7 +223,7 @@ public final class CommentService {
     private static String movieKey(Movie movie) {
         String id = valueOr(movie.getId(), "").trim();
         if (!id.isEmpty() && !id.startsWith("import-")) return id;
-        return "import-" + sha256(valueOr(movie.getTitle(), "") + "|" + valueOr(movie.getYear(), "")).substring(0, 32);
+        return "import-" + sha256(valueOr(movie.getTitle(), "") + "|" + valueOr(movie.getYear(), "")).substring(0, 13);
     }
 
     private static void setDecimal(PreparedStatement statement, int index, String value) throws SQLException {
