@@ -56,6 +56,36 @@ class AnalysisServiceTest {
     }
 
     @Test
+    void doesNotTreatReportedNegativeOpinionsAsTheReviewersOwnSentiment() {
+        Movie movie = new Movie();
+        movie.setTitle("转述语境验收电影");
+        Comment comment = comment(
+                "reported-negative",
+                "重映后，居然好多人说是烂片😅 这到底是《指环王》烂了，还是这个时代越来越烂了",
+                5
+        );
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("正面", comment.getSentiment());
+    }
+
+    @Test
+    void givesMoreWeightToAContrastingPositiveConclusion() {
+        Movie movie = new Movie();
+        movie.setTitle("先抑后扬验收电影");
+        Comment comment = comment(
+                "positive-conclusion",
+                "有些电影大烂配不上观众，但也有些观众大烂配不上电影。指环王，yyds。迟到了五年的好评。不管怎么说，有生之年还能在大银幕上看到你，就是足够让我开心的一件事了。",
+                5
+        );
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("正面", comment.getSentiment());
+    }
+
+    @Test
     void appliesRuleLabelsForAiCommentDetails() {
         Comment comment = comment("ai-high-star-negative", "中段拖沓又尴尬，结尾尤其失望。", 4);
 
