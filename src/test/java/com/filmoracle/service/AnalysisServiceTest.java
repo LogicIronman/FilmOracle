@@ -45,18 +45,18 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void classifiesStrongNegativeWordingAsNegativeEvenWithHighStarRating() {
+    void classifiesConflictingHighRatingAndNegativeWordingAsNeutral() {
         Movie movie = new Movie();
         movie.setTitle("情感规则验收电影");
         Comment comment = comment("high-star-negative", "画面很好，但中段拖沓又尴尬，结尾尤其失望。", 4);
 
         AnalysisService.analyze(List.of(comment), movie);
 
-        assertEquals("负面", comment.getSentiment());
+        assertEquals("中性", comment.getSentiment());
     }
 
     @Test
-    void doesNotTreatReportedNegativeOpinionsAsTheReviewersOwnSentiment() {
+    void classifiesReportedAndRhetoricalNegativeOpinionsAsNeutral() {
         Movie movie = new Movie();
         movie.setTitle("转述语境验收电影");
         Comment comment = comment(
@@ -67,11 +67,11 @@ class AnalysisServiceTest {
 
         AnalysisService.analyze(List.of(comment), movie);
 
-        assertEquals("正面", comment.getSentiment());
+        assertEquals("中性", comment.getSentiment());
     }
 
     @Test
-    void givesMoreWeightToAContrastingPositiveConclusion() {
+    void classifiesMixedNegativeContextAndPositiveConclusionAsNeutral() {
         Movie movie = new Movie();
         movie.setTitle("先抑后扬验收电影");
         Comment comment = comment(
@@ -82,7 +82,59 @@ class AnalysisServiceTest {
 
         AnalysisService.analyze(List.of(comment), movie);
 
+        assertEquals("中性", comment.getSentiment());
+    }
+
+    @Test
+    void classifiesPraiseFollowedByCriticismAsNeutral() {
+        Movie movie = new Movie();
+        movie.setTitle("褒贬混合验收电影");
+        Comment comment = comment(
+                "praise-then-criticism",
+                "场景好美！！特效好棒！！但是剧情我真的不是很感冒，差点看睡着了。",
+                4
+        );
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("中性", comment.getSentiment());
+    }
+
+    @Test
+    void keepsPureDissatisfactionNegative() {
+        Movie movie = new Movie();
+        movie.setTitle("纯负面验收电影");
+        Comment comment = comment(
+                "pure-negative",
+                "剧情混乱，表演尴尬，节奏拖沓，完全不满意。",
+                2
+        );
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("负面", comment.getSentiment());
+    }
+
+    @Test
+    void classifiesUnratedCommentsWithClearPraiseAsPositive() {
+        Movie movie = new Movie();
+        movie.setTitle("未评分验收电影");
+        Comment comment = comment("unrated", "那个世界上最美的精灵啊。", 0);
+
+        AnalysisService.analyze(List.of(comment), movie);
+
         assertEquals("正面", comment.getSentiment());
+    }
+
+    @Test
+    void keepsUnratedCommentsWithoutClearEvidenceNeutral() {
+        Movie movie = new Movie();
+        movie.setTitle("未评分中性验收电影");
+        Comment comment = comment("unrated-neutral", "二十年后重新看了一遍，想法和以前不一样。", 0);
+
+        AnalysisService.analyze(List.of(comment), movie);
+
+        assertEquals("中性", comment.getSentiment());
     }
 
     @Test
@@ -91,7 +143,7 @@ class AnalysisServiceTest {
 
         AnalysisService.applyRuleLabels(List.of(comment));
 
-        assertEquals("负面", comment.getSentiment());
+        assertEquals("中性", comment.getSentiment());
     }
 
     @Test
@@ -103,7 +155,7 @@ class AnalysisServiceTest {
 
         List<Map<String, Object>> details = (List<Map<String, Object>>) builder.invoke(null, List.of(comment));
 
-        assertEquals("负面", details.getFirst().get("sentiment"));
+        assertEquals("中性", details.getFirst().get("sentiment"));
     }
 
     private Comment comment(String id, String text, int rating) {

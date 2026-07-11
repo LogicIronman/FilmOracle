@@ -39,14 +39,14 @@ public class AnalysisService {
     // 正面情感词
     private static final String POSITIVE_WORDS =
             "精彩|绝了|太绝|惊艳|神作|杰作|经典|完美|震撼|感动|戳中|共鸣|喜欢|爱了|吹爆|好看|推荐|必看|封神|" +
-            "好评|开心|值得|认可|支持|yyds|永远的神|大师|高级|精妙|细腻|到位|精准|教科书|层次|深度|出色|优秀|惊艳|赞叹|叹服|回味|余味|舒服|满足|" +
+            "好评|好美|好棒|最美|开心|值得|认可|支持|yyds|永远的神|大师|高级|精妙|细腻|到位|精准|教科书|层次|深度|出色|优秀|惊艳|赞叹|叹服|回味|余味|舒服|满足|" +
             "实力|天赋|天才|影帝|影后|精湛|炉火纯青|入木三分|淋漓尽致|酣畅淋漓|热血沸腾|泪目|破防|治愈|温暖";
 
     // 负面情感词
     private static final String NEGATIVE_WORDS =
             "烂|差|失望|无聊|拖沓|尴尬|刻意|做作|生硬|多余|浪费|可惜|遗憾|平庸|俗套|老套|套路|肤浅|" +
             "空洞|乏味|没意思|不值|烂片|踩雷|避雷|无语|崩溃|窒息|压抑|难受|别扭|出戏|违和|尴尬癌|败笔|" +
-            "减分|拉胯|不行|太差|浪费时间|昏昏欲睡|如坐针毡|惨不忍睹|一言难尽|过誉|名不副实";
+            "减分|拉胯|不行|太差|不感冒|看睡|睡着|混乱|不满意|浪费时间|昏昏欲睡|如坐针毡|惨不忍睹|一言难尽|过誉|名不副实";
 
     // 转述他人差评不等于评论者本人持负面态度；反问式二选一常用于为影片辩护。
     private static final Pattern REPORTED_NEGATIVE_OPINION = Pattern.compile(
@@ -320,33 +320,23 @@ public class AnalysisService {
         String text = c.getText() == null ? "" : c.getText();
         int pos = countMatches(text, POSITIVE_WORDS);
         int neg = countMatches(text, NEGATIVE_WORDS);
+        int rating = c.getRatingValue();
 
-        Matcher reported = REPORTED_NEGATIVE_OPINION.matcher(text);
-        while (reported.find()) {
-            // “烂片”会同时命中“烂”和“烂片”，因此每处转述抵消两个负面命中。
-            neg = Math.max(0, neg - 2);
-        }
+        // 保守三分类：双向证据、明显转折、转述反问或评分冲突都不强行选边。
+        if (pos > 0 && neg > 0) return "中性";
+        if ((pos > 0 || neg > 0) && POSITIVE_TURN.matcher(text).find()) return "中性";
+        if (rating >= 4 && (REPORTED_NEGATIVE_OPINION.matcher(text).find()
+                || RHETORICAL_NEGATIVE_COMPARISON.matcher(text).find())) return "中性";
+        if (rating >= 4 && neg > 0) return "中性";
+        if (rating >= 1 && rating <= 2 && pos > 0) return "中性";
 
-        // 高星评论中的“到底是影片差，还是外部环境差”通常是反问辩护，而非给影片差评。
-        if (c.getRatingValue() >= 4 && RHETORICAL_NEGATIVE_COMPARISON.matcher(text).find()) {
-            neg = Math.max(0, neg - 2);
-        }
+        // 只有单向、明确的文本证据才直接归入正面或负面。
+        if (neg > 0) return "负面";
+        if (pos > 0) return "正面";
 
-        // “但/不过/不管怎么说”之后是评论者最终落点，额外计算一次以体现先抑后扬。
-        Matcher turn = POSITIVE_TURN.matcher(text);
-        int conclusionStart = -1;
-        while (turn.find()) conclusionStart = turn.end();
-        if (conclusionStart >= 0 && conclusionStart < text.length()) {
-            String conclusion = text.substring(conclusionStart);
-            pos += countMatches(conclusion, POSITIVE_WORDS);
-            neg += countMatches(conclusion, NEGATIVE_WORDS);
-        }
-
-        // 明确且更强的文本情绪优先于星级，避免“4星但拖沓、失望”等保留意见被误标为正面。
-        if (neg >= pos + 2) return "负面";
-        if (pos >= neg + 2) return "正面";
-        if (c.getRatingValue() >= 4) return "正面";
-        if (c.getRatingValue() <= 2) return "负面";
+        // 文本没有明确证据时才使用有效星级兜底；0 表示未评分，应保持中性。
+        if (rating >= 4) return "正面";
+        if (rating >= 1 && rating <= 2) return "负面";
         return "中性";
     }
 
